@@ -15,9 +15,43 @@ interface RecordRow {
   status: AttendanceStatus;
   review_note: string | null;
   reviewed_at: string | null;
+  worked_minutes: number | null;
+  break_minutes: number | null;
+  late_minutes: number | null;
+  undertime_minutes: number | null;
+  overtime_minutes: number | null;
+  day_class: string | null;
+  flags: string[];
+  corrections: Record<string, number> | null;
   employee: { id: string; full_name: string; employee_code: string } | null;
   branch: { name: string } | null;
   reviewer: { full_name: string } | null;
+}
+
+const FLAG_BADGE: Record<string, string> = {
+  on_time: 'bg-green-100 text-green-700',
+  late: 'bg-amber-100 text-amber-700',
+  early_out: 'bg-amber-100 text-amber-700',
+  overtime: 'bg-sky-100 text-sky-700',
+  no_clock_out: 'bg-red-100 text-red-700',
+  absent: 'bg-red-100 text-red-700',
+};
+
+const DAY_CLASS_LABEL: Record<string, string> = {
+  regular: '',
+  rest_day: 'Rest day',
+  regular_holiday: 'Holiday',
+  special_holiday: 'Special holiday',
+};
+
+function fmtMinutes(m: number | null | undefined): string {
+  if (m === null || m === undefined) return '—';
+  return `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m`;
+}
+
+/** Corrections layer over computed values. */
+function effective(r: RecordRow, key: 'worked_minutes' | 'late_minutes' | 'overtime_minutes'): number | null {
+  return r.corrections?.[key] ?? r[key];
 }
 
 interface EventRow {
@@ -119,11 +153,71 @@ function DayDetail({ record }: { record: RecordRow }) {
   );
 }
 
+function CorrectionForm({
+  record,
+  onSave,
+  onCancel,
+}: {
+  record: RecordRow;
+  onSave: (note: string, corrections: Record<string, number>) => void;
+  onCancel: () => void;
+}) {
+  const [worked, setWorked] = useState(String(effective(record, 'worked_minutes') ?? 0));
+  const [late, setLate] = useState(String(effective(record, 'late_minutes') ?? 0));
+  const [ot, setOt] = useState(String(effective(record, 'overtime_minutes') ?? 0));
+  const [note, setNote] = useState('');
+
+  return (
+    <div className="border-t border-gray-200 bg-amber-50 px-4 py-3">
+      <p className="text-xs font-semibold text-amber-800">
+        Correct this day — values below override the computed numbers (all in minutes).
+      </p>
+      <div className="mt-2 flex flex-wrap items-end gap-3">
+        <label className="text-xs text-gray-600">
+          Worked
+          <input value={worked} onChange={(e) => setWorked(e.target.value.replace(/\D/g, ''))}
+            className="mt-1 block w-24 rounded-lg border border-gray-300 px-2 py-1.5 text-sm" />
+        </label>
+        <label className="text-xs text-gray-600">
+          Late
+          <input value={late} onChange={(e) => setLate(e.target.value.replace(/\D/g, ''))}
+            className="mt-1 block w-20 rounded-lg border border-gray-300 px-2 py-1.5 text-sm" />
+        </label>
+        <label className="text-xs text-gray-600">
+          Overtime
+          <input value={ot} onChange={(e) => setOt(e.target.value.replace(/\D/g, ''))}
+            className="mt-1 block w-20 rounded-lg border border-gray-300 px-2 py-1.5 text-sm" />
+        </label>
+        <label className="min-w-64 flex-1 text-xs text-gray-600">
+          Reason (required)
+          <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. forgot to clock out, confirmed with branch manager"
+            className="mt-1 block w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm" />
+        </label>
+        <button
+          onClick={() => onSave(note, {
+            worked_minutes: Number(worked || 0),
+            late_minutes: Number(late || 0),
+            overtime_minutes: Number(ot || 0),
+          })}
+          disabled={!note.trim()}
+          className="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+        >
+          Save correction
+        </button>
+        <button onClick={onCancel} className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700">
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function Reviews() {
   const { profile } = useAuth();
   const [rows, setRows] = useState<RecordRow[]>([]);
   const [statusFilter, setStatusFilter] = useState<string>('pending_review');
   const [openId, setOpenId] = useState<string | null>(null);
+  const [correctId, setCorrectId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const canReview = profile ? REVIEWER_ROLES.includes(profile.role) : false;
@@ -132,7 +226,7 @@ export function Reviews() {
     let q = supabase
       .from('attendance_records')
       .select(
-        'id, work_date, status, review_note, reviewed_at, employee:profiles!attendance_records_employee_id_fkey(id, full_name, employee_code), branch:branches(name), reviewer:profiles!attendance_records_reviewed_by_fkey(full_name)',
+        'id, work_date, status, review_note, reviewed_at, worked_minutes, break_minutes, late_minutes, undertime_minutes, overtime_minutes, day_class, flags, corrections, employee:profiles!attendance_records_employee_id_fkey(id, full_name, employee_code), branch:branches(name), reviewer:profiles!attendance_records_reviewed_by_fkey(full_name)',
       )
       .order('work_date', { ascending: false })
       .limit(100);
@@ -142,22 +236,28 @@ export function Reviews() {
 
   useEffect(load, [load]);
 
-  const review = async (id: string, status: AttendanceStatus) => {
+  const review = async (
+    id: string,
+    status: AttendanceStatus,
+    note: string | null = null,
+    corrections: Record<string, number> | null = null,
+  ) => {
     setError(null);
-    let note: string | null = null;
-    if (status === 'rejected' || status === 'corrected') {
-      note = window.prompt(
-        status === 'rejected' ? 'Reason for rejection:' : 'Correction note (what was fixed):',
-      );
+    if (status === 'rejected' && !note) {
+      note = window.prompt('Reason for rejection:');
       if (!note?.trim()) return;
     }
     const { error: rpcErr } = await supabase.rpc('review_attendance', {
       p_record_id: id,
       p_status: status,
       p_note: note,
+      p_corrections: corrections,
     });
     if (rpcErr) setError(rpcErr.message);
-    else load();
+    else {
+      setCorrectId(null);
+      load();
+    }
   };
 
   return (
@@ -192,16 +292,17 @@ export function Reviews() {
             <tr>
               <th className="px-4 py-2 font-medium">Date</th>
               <th className="px-4 py-2 font-medium">Employee</th>
-              <th className="px-4 py-2 font-medium">Branch</th>
+              <th className="px-4 py-2 font-medium">Worked</th>
+              <th className="px-4 py-2 font-medium">Late / OT</th>
+              <th className="px-4 py-2 font-medium">Flags</th>
               <th className="px-4 py-2 font-medium">Status</th>
-              <th className="px-4 py-2 font-medium">Note</th>
               <th className="px-4 py-2" />
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {rows.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-6 text-center text-gray-400">
+                <td colSpan={7} className="px-4 py-6 text-center text-gray-400">
                   Nothing here — punches create review entries automatically.
                 </td>
               </tr>
@@ -209,19 +310,45 @@ export function Reviews() {
             {rows.map((r) => (
               <>
                 <tr key={r.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-2 text-gray-900">{r.work_date}</td>
-                  <td className="px-4 py-2">
-                    <span className="font-medium text-gray-900">{r.employee?.full_name ?? '—'}</span>{' '}
-                    <span className="text-xs text-gray-500">{r.employee?.employee_code}</span>
+                  <td className="whitespace-nowrap px-4 py-2 text-gray-900">
+                    {r.work_date}
+                    {r.day_class && DAY_CLASS_LABEL[r.day_class] && (
+                      <span className="ml-1.5 rounded-full bg-purple-100 px-1.5 py-0.5 text-[10px] text-purple-700">
+                        {DAY_CLASS_LABEL[r.day_class]}
+                      </span>
+                    )}
                   </td>
-                  <td className="px-4 py-2 text-gray-600">{r.branch?.name ?? '—'}</td>
                   <td className="px-4 py-2">
-                    <span className={`rounded-full px-2 py-0.5 text-xs ${STATUS_BADGE[r.status]}`}>
-                      {STATUS_LABEL[r.status]}
+                    <span className="font-medium text-gray-900">{r.employee?.full_name ?? '—'}</span>
+                    <span className="block text-xs text-gray-500">
+                      {r.employee?.employee_code} · {r.branch?.name ?? 'no branch'}
                     </span>
                   </td>
-                  <td className="max-w-40 truncate px-4 py-2 text-xs text-gray-500" title={r.review_note ?? ''}>
-                    {r.review_note ?? '—'}
+                  <td className="whitespace-nowrap px-4 py-2 text-gray-900">
+                    {fmtMinutes(effective(r, 'worked_minutes'))}
+                    {r.corrections && <span className="ml-1 text-xs text-sky-600" title="corrected by HR">✏️</span>}
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-2 text-xs text-gray-600">
+                    {effective(r, 'late_minutes') ? `late ${effective(r, 'late_minutes')}m` : '—'}
+                    {' / '}
+                    {effective(r, 'overtime_minutes') ? `OT ${effective(r, 'overtime_minutes')}m` : '—'}
+                  </td>
+                  <td className="px-4 py-2">
+                    <span className="flex flex-wrap gap-1">
+                      {(r.flags ?? []).map((f) => (
+                        <span key={f} className={`rounded-full px-1.5 py-0.5 text-[10px] ${FLAG_BADGE[f] ?? 'bg-gray-100 text-gray-600'}`}>
+                          {f.replace(/_/g, ' ')}
+                        </span>
+                      ))}
+                    </span>
+                  </td>
+                  <td className="px-4 py-2">
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs ${STATUS_BADGE[r.status]}`}
+                      title={r.review_note ?? ''}
+                    >
+                      {STATUS_LABEL[r.status]}
+                    </span>
                   </td>
                   <td className="space-x-2 whitespace-nowrap px-4 py-2 text-right">
                     <button
@@ -245,7 +372,7 @@ export function Reviews() {
                           Reject
                         </button>
                         <button
-                          onClick={() => review(r.id, 'corrected')}
+                          onClick={() => setCorrectId(correctId === r.id ? null : r.id)}
                           className="rounded-lg border border-gray-300 px-2.5 py-1 text-xs text-gray-700 hover:bg-gray-100"
                         >
                           Correct
@@ -254,9 +381,20 @@ export function Reviews() {
                     )}
                   </td>
                 </tr>
+                {correctId === r.id && (
+                  <tr key={`${r.id}-correct`}>
+                    <td colSpan={7} className="p-0">
+                      <CorrectionForm
+                        record={r}
+                        onSave={(note, corrections) => void review(r.id, 'corrected', note, corrections)}
+                        onCancel={() => setCorrectId(null)}
+                      />
+                    </td>
+                  </tr>
+                )}
                 {openId === r.id && (
                   <tr key={`${r.id}-detail`}>
-                    <td colSpan={6} className="p-0">
+                    <td colSpan={7} className="p-0">
                       <DayDetail record={r} />
                     </td>
                   </tr>

@@ -10,6 +10,7 @@ import { Overview } from './pages/Overview';
 import { Punches } from './pages/Punches';
 import { Kiosks } from './pages/Kiosks';
 import { Reviews } from './pages/Reviews';
+import { Settings } from './pages/Settings';
 
 function Loading() {
   return (
@@ -62,6 +63,7 @@ export default function App() {
             <Route path="/kiosks" element={<Kiosks />} />
             <Route path="/branches" element={<Branches />} />
             <Route path="/org" element={<Org />} />
+            <Route path="/settings" element={<Settings />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

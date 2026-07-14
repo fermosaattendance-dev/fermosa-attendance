@@ -40,7 +40,16 @@ export interface Branch {
   geofence_radius_m: number;
   timezone: string;
   is_active: boolean;
+  /** Branch default schedule (per-employee shifts arrive with scheduling). */
+  shift_start: string; // 'HH:MM:SS'
+  shift_end: string;
+  work_days: number[]; // ISO weekday numbers, 1 = Monday … 7 = Sunday
 }
+
+export type DayClass = 'regular' | 'rest_day' | 'regular_holiday' | 'special_holiday';
+
+/** Engine flags on a daily record — separate from approval status. */
+export type RecordFlag = 'on_time' | 'late' | 'early_out' | 'no_clock_out' | 'overtime' | 'absent';
 
 export interface Profile {
   id: string; // = auth.users.id

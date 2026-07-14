@@ -7,6 +7,8 @@ const inputClass =
   'mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none';
 const labelClass = 'block text-sm font-medium text-gray-700';
 
+const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']; // ISO 1..7
+
 const emptyForm = {
   name: '',
   address: '',
@@ -15,6 +17,9 @@ const emptyForm = {
   geofence_radius_m: String(DEFAULT_GEOFENCE_RADIUS_M),
   timezone: DEFAULT_TIMEZONE,
   is_active: true,
+  shift_start: '10:00',
+  shift_end: '19:00',
+  work_days: [1, 2, 3, 4, 5, 6] as number[],
 };
 
 export function Branches() {
@@ -48,8 +53,20 @@ export function Branches() {
       geofence_radius_m: String(b.geofence_radius_m),
       timezone: b.timezone,
       is_active: b.is_active,
+      shift_start: b.shift_start.slice(0, 5),
+      shift_end: b.shift_end.slice(0, 5),
+      work_days: b.work_days ?? [1, 2, 3, 4, 5, 6],
     });
     setError(null);
+  };
+
+  const toggleDay = (day: number) => {
+    setForm((f) => ({
+      ...f,
+      work_days: f.work_days.includes(day)
+        ? f.work_days.filter((d) => d !== day)
+        : [...f.work_days, day].sort(),
+    }));
   };
 
   const onSubmit = async (e: FormEvent) => {
@@ -64,7 +81,15 @@ export function Branches() {
       geofence_radius_m: Number(form.geofence_radius_m),
       timezone: form.timezone.trim() || DEFAULT_TIMEZONE,
       is_active: form.is_active,
+      shift_start: form.shift_start,
+      shift_end: form.shift_end,
+      work_days: form.work_days,
     };
+    if (form.work_days.length === 0) {
+      setError('Select at least one working day.');
+      setBusy(false);
+      return;
+    }
     if (Number.isNaN(payload.lat) || Number.isNaN(payload.lng)) {
       setError('Latitude and longitude must be numbers (e.g. 14.2818, 120.8656).');
       setBusy(false);
@@ -132,6 +157,38 @@ export function Branches() {
               <label className={labelClass}>Timezone</label>
               <input value={form.timezone} onChange={(e) => setForm({ ...form, timezone: e.target.value })} className={inputClass} />
             </div>
+            <div>
+              <label className={labelClass}>Shift start</label>
+              <input type="time" value={form.shift_start} onChange={(e) => setForm({ ...form, shift_start: e.target.value })} className={inputClass} />
+            </div>
+            <div>
+              <label className={labelClass}>Shift end</label>
+              <input type="time" value={form.shift_end} onChange={(e) => setForm({ ...form, shift_end: e.target.value })} className={inputClass} />
+            </div>
+          </div>
+
+          <div className="mt-4">
+            <label className={labelClass}>Working days (attendance is expected on these days)</label>
+            <div className="mt-2 flex gap-2">
+              {DAY_LABELS.map((label, i) => {
+                const day = i + 1;
+                const active = form.work_days.includes(day);
+                return (
+                  <button
+                    key={day}
+                    type="button"
+                    onClick={() => toggleDay(day)}
+                    className={
+                      active
+                        ? 'rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white'
+                        : 'rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100'
+                    }
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
           <label className="mt-4 flex items-center gap-2 text-sm text-gray-700">
             <input
@@ -170,6 +227,7 @@ export function Branches() {
               <th className="px-4 py-2 font-medium">Branch</th>
               <th className="px-4 py-2 font-medium">Address</th>
               <th className="px-4 py-2 font-medium">Coordinates</th>
+              <th className="px-4 py-2 font-medium">Schedule</th>
               <th className="px-4 py-2 font-medium">Geofence</th>
               <th className="px-4 py-2 font-medium">Status</th>
               <th className="px-4 py-2" />
@@ -182,6 +240,10 @@ export function Branches() {
                 <td className="px-4 py-2 text-gray-600">{b.address ?? '—'}</td>
                 <td className="px-4 py-2 font-mono text-xs text-gray-600">
                   {b.lat.toFixed(4)}, {b.lng.toFixed(4)}
+                </td>
+                <td className="px-4 py-2 text-xs text-gray-600">
+                  {b.shift_start.slice(0, 5)}–{b.shift_end.slice(0, 5)} ·{' '}
+                  {(b.work_days ?? []).map((d) => DAY_LABELS[d - 1]).join(' ')}
                 </td>
                 <td className="px-4 py-2 text-gray-600">{b.geofence_radius_m} m</td>
                 <td className="px-4 py-2">
