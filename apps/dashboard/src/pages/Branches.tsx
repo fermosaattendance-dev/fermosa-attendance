@@ -10,7 +10,7 @@ import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
 
 const inputClass =
-  'mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none';
+  'mt-1 input';
 const labelClass = 'block text-sm font-medium text-gray-700';
 
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']; // ISO 1..7
@@ -156,21 +156,21 @@ export function Branches() {
     <div className="mx-auto max-w-4xl">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-gray-900">Branches</h2>
+          <h2 className="text-lg font-semibold text-ink">Branches</h2>
           <p className="text-sm text-gray-500">
             Coordinates + radius define each branch&apos;s clock-in geofence.
           </p>
         </div>
         <button
           onClick={startNew}
-          className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
+          className="btn-primary"
         >
           New branch
         </button>
       </div>
 
       {editingId && (
-        <form onSubmit={onSubmit} className="mt-4 rounded-xl border border-gray-200 bg-white p-6">
+        <form onSubmit={onSubmit} className="mt-4 card p-6">
           <h3 className="text-sm font-semibold text-gray-900">
             {editingId === 'new' ? 'New branch' : 'Edit branch'}
           </h3>
@@ -227,7 +227,7 @@ export function Branches() {
                     onClick={() => toggleDay(day)}
                     className={
                       active
-                        ? 'rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white'
+                        ? 'rounded-lg bg-brand-500 px-3 py-1.5 text-sm font-medium text-on-gold'
                         : 'rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100'
                     }
                   >
@@ -252,14 +252,14 @@ export function Branches() {
             <button
               type="submit"
               disabled={busy}
-              className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+              className="btn-primary"
             >
               {busy ? 'Saving…' : 'Save'}
             </button>
             <button
               type="button"
               onClick={() => setEditingId(null)}
-              className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+              className="btn"
             >
               Cancel
             </button>
@@ -268,7 +268,7 @@ export function Branches() {
       )}
 
       {recompute && (
-        <div className="mt-4 rounded-xl border border-gray-200 bg-white p-6">
+        <div className="mt-4 card p-6">
           <h3 className="text-sm font-semibold text-gray-900">
             Recompute pending days — {recompute.branch.name}
           </h3>
@@ -288,13 +288,13 @@ export function Branches() {
             <button
               onClick={runRecompute}
               disabled={recomputeBusy}
-              className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+              className="btn-primary"
             >
               {recomputeBusy ? 'Recomputing…' : 'Recompute'}
             </button>
             <button
               onClick={() => setRecompute(null)}
-              className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+              className="btn"
             >
               Close
             </button>
@@ -307,9 +307,9 @@ export function Branches() {
         </div>
       )}
 
-      <div className="mt-4 overflow-hidden rounded-xl border border-gray-200 bg-white">
+      <div className="mt-4 overflow-hidden card">
         <table className="w-full text-left text-sm">
-          <thead className="bg-gray-50 text-gray-600">
+          <thead className="bg-ground text-muted">
             <tr>
               <th className="px-4 py-2 font-medium">Branch</th>
               <th className="px-4 py-2 font-medium">Address</th>

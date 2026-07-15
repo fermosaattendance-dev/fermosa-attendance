@@ -94,7 +94,7 @@ export default function ChangePasswordScreen() {
                 disabled={submitting}
               >
                 {submitting ? (
-                  <ActivityIndicator color="#fff" />
+                  <ActivityIndicator color="#3A2D06" />
                 ) : (
                   <Text style={styles.buttonText}>Save new password</Text>
                 )}
@@ -108,10 +108,10 @@ export default function ChangePasswordScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#fdf2f8' },
+  safeArea: { flex: 1, backgroundColor: '#F7F6F2' },
   container: { flex: 1, justifyContent: 'center', padding: 24 },
   back: { position: 'absolute', top: 16, left: 20 },
-  backText: { color: '#d64580', fontSize: 15, fontWeight: '500' },
+  backText: { color: '#B7860B', fontSize: 15, fontWeight: '600' },
   card: {
     backgroundColor: '#fff',
     borderRadius: 16,
@@ -139,11 +139,11 @@ const styles = StyleSheet.create({
   success: { marginTop: 16, color: '#15803d', fontSize: 15, fontWeight: '500' },
   button: {
     marginTop: 20,
-    backgroundColor: '#d64580',
+    backgroundColor: '#F5C518',
     borderRadius: 10,
     paddingVertical: 12,
     alignItems: 'center',
   },
   buttonPressed: { opacity: 0.7 },
-  buttonText: { color: '#fff', fontSize: 15, fontWeight: '600' },
+  buttonText: { color: '#3A2D06', fontSize: 15, fontWeight: '700' },
 });

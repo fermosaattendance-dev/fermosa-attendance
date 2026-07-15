@@ -11,17 +11,14 @@
     "scheme": "fermosa",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon",
       "supportsTablet": true,
       "bundleIdentifier": "ph.fermosa.attendance"
     },
     "android": {
       "package": "ph.fermosa.attendance",
       "adaptiveIcon": {
-        "backgroundColor": "#fdf2f8",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "backgroundColor": "#FFFFFF",
+        "foregroundImage": "./assets/images/android-icon-foreground.png"
       },
       "predictiveBackGestureEnabled": false
     },
@@ -46,9 +43,9 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#d64580",
+          "backgroundColor": "#FFFFFF",
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
+          "imageWidth": 140
         }
       ],
       "@react-native-community/datetimepicker"

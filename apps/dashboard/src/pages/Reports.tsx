@@ -303,7 +303,7 @@ export function Reports() {
   return (
     <div className="mx-auto max-w-6xl">
       <div>
-        <h2 className="text-lg font-semibold text-gray-900">Reports</h2>
+        <h2 className="text-lg font-semibold text-ink">Reports</h2>
         <p className="text-sm text-gray-500">
           Attendance &amp; payroll reports, scoped to your access. Export to Excel or CSV.
         </p>
@@ -314,14 +314,14 @@ export function Reports() {
           <button
             key={r.key}
             onClick={() => setReportType(r.key)}
-            className={`rounded-md px-3 py-1.5 ${reportType === r.key ? 'bg-brand-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+            className={`rounded-md px-3 py-1.5 ${reportType === r.key ? 'bg-brand-500 text-on-gold' : 'text-gray-600 hover:bg-gray-100'}`}
           >
             {r.label}
           </button>
         ))}
       </div>
 
-      <div className="mt-4 flex flex-wrap items-end gap-3 rounded-xl border border-gray-200 bg-white p-4">
+      <div className="mt-4 flex flex-wrap items-end gap-3 card p-4">
         {showPeriod && (
           <>
             <label className="text-sm">
@@ -329,7 +329,7 @@ export function Reports() {
               <select
                 value={month}
                 onChange={(e) => setMonth(Number(e.target.value))}
-                className="mt-1 rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                className="mt-1 input"
               >
                 {MONTHS.map((m, i) => (
                   <option key={m} value={i + 1}>
@@ -343,7 +343,7 @@ export function Reports() {
               <select
                 value={year}
                 onChange={(e) => setYear(Number(e.target.value))}
-                className="mt-1 rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                className="mt-1 input"
               >
                 {years.map((y) => (
                   <option key={y} value={y}>
@@ -357,13 +357,13 @@ export function Reports() {
               <div className="mt-1 flex gap-1">
                 <button
                   onClick={() => setHalf(1)}
-                  className={`rounded-lg px-3 py-2 text-sm ${half === 1 ? 'bg-brand-600 text-white' : 'border border-gray-300 text-gray-600'}`}
+                  className={`rounded-lg px-3 py-2 text-sm ${half === 1 ? 'bg-brand-500 text-on-gold' : 'border border-gray-300 text-gray-600'}`}
                 >
                   1–15
                 </button>
                 <button
                   onClick={() => setHalf(2)}
-                  className={`rounded-lg px-3 py-2 text-sm ${half === 2 ? 'bg-brand-600 text-white' : 'border border-gray-300 text-gray-600'}`}
+                  className={`rounded-lg px-3 py-2 text-sm ${half === 2 ? 'bg-brand-500 text-on-gold' : 'border border-gray-300 text-gray-600'}`}
                 >
                   16–EOM
                 </button>
@@ -379,7 +379,7 @@ export function Reports() {
               type="date"
               value={dayDate}
               onChange={(e) => setDayDate(e.target.value)}
-              className="mt-1 rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              className="mt-1 input"
             />
           </label>
         )}
@@ -390,7 +390,7 @@ export function Reports() {
             <select
               value={employeeId}
               onChange={(e) => setEmployeeId(e.target.value)}
-              className="mt-1 rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              className="mt-1 input"
             >
               <option value="">Select…</option>
               {employees.map((e) => (
@@ -408,7 +408,7 @@ export function Reports() {
             <select
               value={branchId}
               onChange={(e) => setBranchId(e.target.value)}
-              className="mt-1 rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              className="mt-1 input"
             >
               <option value="">All branches</option>
               {branches.map((b) => (
@@ -424,14 +424,14 @@ export function Reports() {
           <button
             disabled={!canExport}
             onClick={() => exportXlsx(table.filename, [{ name: table.sheetName, headers: table.headers, rows: table.rows }])}
-            className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-40"
+            className="btn-primary"
           >
             Export Excel
           </button>
           <button
             disabled={!canExport}
             onClick={() => exportCsv(table.filename, table.headers, table.rows)}
-            className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-40"
+            className="btn"
           >
             Export CSV
           </button>
@@ -447,9 +447,9 @@ export function Reports() {
         {loading && <span>Loading…</span>}
       </div>
 
-      <div className="mt-1 overflow-x-auto rounded-xl border border-gray-200 bg-white">
+      <div className="mt-1 overflow-x-auto card">
         <table className="w-full text-left text-sm">
-          <thead className="bg-gray-50 text-gray-600">
+          <thead className="bg-ground text-muted">
             <tr>
               {table.headers.map((h) => (
                 <th key={h} className="whitespace-nowrap px-3 py-2 font-medium">
@@ -537,7 +537,7 @@ function PayrollSyncPanel({ period, branchId, rowCount }: { period: PayPeriod; b
   };
 
   return (
-    <div className="mt-6 rounded-xl border border-gray-200 bg-white p-4">
+    <div className="mt-6 card p-4">
       <h3 className="text-sm font-semibold text-gray-900">Payroll sync → Google Sheets</h3>
       <p className="mt-0.5 text-xs text-gray-500">
         Pushes the approved payroll rows for {formatPeriodLabel(period)} to the tab “{formatPeriodLabel(period)}”.
@@ -547,7 +547,7 @@ function PayrollSyncPanel({ period, branchId, rowCount }: { period: PayPeriod; b
         <button
           onClick={sync}
           disabled={busy}
-          className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+          className="btn-primary"
         >
           {busy ? 'Syncing…' : dryRun ? 'Dry-run sync' : 'Sync to Google Sheets'}
         </button>

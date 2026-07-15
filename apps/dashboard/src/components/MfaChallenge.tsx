@@ -43,7 +43,7 @@ export function MfaChallenge() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
-      <form onSubmit={verify} className="w-full max-w-sm rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+      <form onSubmit={verify} className="w-full max-w-sm card p-6">
         <h1 className="text-lg font-semibold text-gray-900">Two-factor authentication</h1>
         <p className="mt-1 text-sm text-gray-500">
           Enter the 6-digit code from your authenticator app to finish signing in.
@@ -54,13 +54,13 @@ export function MfaChallenge() {
           onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
           inputMode="numeric"
           placeholder="123456"
-          className="mt-4 w-full rounded-lg border border-gray-300 px-3 py-2 text-center font-mono text-lg tracking-widest focus:border-brand-500 focus:outline-none"
+          className="mt-4 w-full input text-center font-mono text-lg tracking-widest"
         />
         {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
         <button
           type="submit"
           disabled={busy || code.length !== 6}
-          className="mt-4 w-full rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+          className="mt-4 w-full btn-primary"
         >
           {busy ? 'Verifying…' : 'Verify'}
         </button>

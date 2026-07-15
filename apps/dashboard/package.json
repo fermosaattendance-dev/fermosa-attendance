@@ -12,6 +12,7 @@
   "dependencies": {
     "@fermosa/shared": "*",
     "@supabase/supabase-js": "^2.47.0",
+    "lucide-react": "^1.24.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-router-dom": "^6.28.0",

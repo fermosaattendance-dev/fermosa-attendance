@@ -117,7 +117,7 @@ export function TwoFactorCard() {
         1Password, …). Optional, but recommended for admin accounts.
       </p>
 
-      <div className="mt-3 rounded-xl border border-gray-200 bg-white p-5">
+      <div className="mt-3 card p-5">
         {enabled === null && <p className="text-sm text-gray-400">Loading…</p>}
 
         {enabled === false && mode === 'view' && (
@@ -129,7 +129,7 @@ export function TwoFactorCard() {
             <button
               onClick={startEnroll}
               disabled={busy}
-              className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+              className="btn-primary"
             >
               {busy ? 'Starting…' : 'Set up 2FA'}
             </button>
@@ -181,7 +181,7 @@ export function TwoFactorCard() {
                   onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                   inputMode="numeric"
                   placeholder="123456"
-                  className="mt-1 w-40 rounded-lg border border-gray-300 px-3 py-2 text-center font-mono tracking-widest focus:border-brand-500 focus:outline-none"
+                  className="mt-1 w-40 input text-center font-mono tracking-widest"
                 />
               </div>
             </div>
@@ -190,7 +190,7 @@ export function TwoFactorCard() {
               <button
                 onClick={confirmEnroll}
                 disabled={busy || code.length !== 6}
-                className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+                className="btn-primary"
               >
                 {busy ? 'Verifying…' : 'Enable 2FA'}
               </button>
@@ -210,7 +210,7 @@ export function TwoFactorCard() {
               onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
               inputMode="numeric"
               placeholder="123456"
-              className="mt-3 w-40 rounded-lg border border-gray-300 px-3 py-2 text-center font-mono tracking-widest focus:border-brand-500 focus:outline-none"
+              className="mt-3 w-40 input text-center font-mono tracking-widest"
             />
             {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
             <div className="mt-4 flex gap-2">

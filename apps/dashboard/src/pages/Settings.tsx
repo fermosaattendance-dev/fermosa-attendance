@@ -19,7 +19,7 @@ interface LeaveTypeRow {
 }
 
 const inputClass =
-  'mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none';
+  'mt-1 input';
 const labelClass = 'block text-sm font-medium text-gray-700';
 
 export function Settings() {
@@ -136,10 +136,10 @@ export function Settings() {
 
   return (
     <div className="mx-auto max-w-3xl">
-      <h2 className="text-lg font-semibold text-gray-900">Attendance settings</h2>
+      <h2 className="text-lg font-semibold text-ink">Attendance settings</h2>
       <p className="text-sm text-gray-500">Company-wide rules the engine applies to every punch.</p>
 
-      <form onSubmit={saveSettings} className="mt-4 rounded-xl border border-gray-200 bg-white p-6">
+      <form onSubmit={saveSettings} className="mt-4 card p-6">
         <div className="grid grid-cols-3 gap-4">
           <div>
             <label className={labelClass}>Late grace (minutes)</label>
@@ -159,7 +159,7 @@ export function Settings() {
         </div>
         {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
         {notice && <p className="mt-3 text-sm text-green-700">{notice}</p>}
-        <button type="submit" className="mt-4 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700">
+        <button type="submit" className="mt-4 btn-primary">
           Save settings
         </button>
       </form>
@@ -170,7 +170,7 @@ export function Settings() {
         non-working days are tracked separately for payroll.
       </p>
 
-      <div className="mt-3 flex items-end gap-3 rounded-xl border border-gray-200 bg-white p-4">
+      <div className="mt-3 flex items-end gap-3 card p-4">
         <div>
           <label className={labelClass}>Date</label>
           <input type="date" value={hDate} onChange={(e) => setHDate(e.target.value)} className={inputClass} />
@@ -187,12 +187,12 @@ export function Settings() {
           </select>
         </div>
         <button onClick={addHoliday} disabled={!hDate || !hName.trim()}
-          className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">
+          className="btn-primary">
           Add
         </button>
       </div>
 
-      <div className="mt-3 overflow-hidden rounded-xl border border-gray-200 bg-white">
+      <div className="mt-3 overflow-hidden card">
         <table className="w-full text-left text-sm">
           <tbody className="divide-y divide-gray-100">
             {holidays.map((h) => (
@@ -233,7 +233,7 @@ export function Settings() {
         </button>
       </div>
 
-      <div className="mt-3 flex items-end gap-3 rounded-xl border border-gray-200 bg-white p-4">
+      <div className="mt-3 flex items-end gap-3 card p-4">
         <div className="flex-1">
           <label className={labelClass}>Name</label>
           <input value={ltName} onChange={(e) => setLtName(e.target.value)} placeholder="e.g. Bereavement" className={inputClass} />
@@ -247,14 +247,14 @@ export function Settings() {
           Paid
         </label>
         <button onClick={addLeaveType} disabled={!ltName.trim()}
-          className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50">
+          className="btn-primary">
           Add
         </button>
       </div>
 
-      <div className="mt-3 overflow-hidden rounded-xl border border-gray-200 bg-white">
+      <div className="mt-3 overflow-hidden card">
         <table className="w-full text-left text-sm">
-          <thead className="bg-gray-50 text-gray-600">
+          <thead className="bg-ground text-muted">
             <tr>
               <th className="px-4 py-2 font-medium">Type</th>
               <th className="px-4 py-2 font-medium">Paid</th>
@@ -283,7 +283,7 @@ export function Settings() {
                         updateLeaveType(t, { default_days_per_year: v });
                       }
                     }}
-                    className="w-20 rounded-lg border border-gray-300 px-2 py-1 text-sm"
+                    className="w-20 input"
                   />
                 </td>
                 <td className="px-4 py-2 text-xs">{t.is_active ? 'Active' : 'Inactive'}</td>

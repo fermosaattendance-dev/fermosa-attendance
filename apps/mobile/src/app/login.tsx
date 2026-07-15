@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -12,6 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { usernameToEmail } from '@fermosa/shared';
 import { supabase } from '@/lib/supabase';
+import { colors, radius, shadowCard, logoMark } from '@/theme';
 
 export default function LoginScreen() {
   const [username, setUsername] = useState('');
@@ -36,8 +38,16 @@ export default function LoginScreen() {
         style={styles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
+        <View style={styles.hero}>
+          <View style={styles.badge}>
+            <Image source={logoMark} style={styles.logo} resizeMode="contain" />
+          </View>
+          <Text style={styles.brand}>Fermosa</Text>
+          <Text style={styles.tagline}>SKIN CARE CLINIC</Text>
+        </View>
+
         <View style={styles.card}>
-          <Text style={styles.title}>Fermosa Attendance</Text>
+          <Text style={styles.title}>Welcome back</Text>
           <Text style={styles.subtitle}>Sign in with your employee account</Text>
 
           <Text style={styles.label}>Username</Text>
@@ -49,7 +59,7 @@ export default function LoginScreen() {
             autoCorrect={false}
             autoComplete="username"
             placeholder="username"
-            placeholderTextColor="#9ca3af"
+            placeholderTextColor={colors.muted}
           />
 
           <Text style={styles.label}>Password</Text>
@@ -61,22 +71,19 @@ export default function LoginScreen() {
             autoCapitalize="none"
             autoCorrect={false}
             placeholder="password"
-            placeholderTextColor="#9ca3af"
+            placeholderTextColor={colors.muted}
             onSubmitEditing={onSubmit}
           />
 
           {error && <Text style={styles.error}>{error}</Text>}
 
           <Pressable
-            style={({ pressed }) => [
-              styles.button,
-              (pressed || submitting) && styles.buttonPressed,
-            ]}
+            style={({ pressed }) => [styles.button, (pressed || submitting) && styles.buttonPressed]}
             onPress={onSubmit}
             disabled={submitting}
           >
             {submitting ? (
-              <ActivityIndicator color="#fff" />
+              <ActivityIndicator color={colors.onGold} />
             ) : (
               <Text style={styles.buttonText}>Sign in</Text>
             )}
@@ -88,39 +95,65 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#fdf2f8' },
-  container: { flex: 1, justifyContent: 'center', padding: 24 },
-  card: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 24,
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 3,
+  safeArea: { flex: 1, backgroundColor: colors.ground },
+  container: { flex: 1, justifyContent: 'center', padding: 24, gap: 20 },
+  hero: {
+    backgroundColor: colors.gold,
+    borderRadius: radius.xl,
+    alignItems: 'center',
+    paddingVertical: 32,
+    paddingHorizontal: 24,
+    ...shadowCard,
   },
-  title: { fontSize: 24, fontWeight: '600', color: '#111827' },
-  subtitle: { marginTop: 4, fontSize: 14, color: '#6b7280', marginBottom: 16 },
-  label: { fontSize: 14, fontWeight: '500', color: '#374151', marginTop: 12 },
+  badge: {
+    width: 76,
+    height: 76,
+    borderRadius: 20,
+    backgroundColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...shadowCard,
+  },
+  logo: { width: 54, height: 54, borderRadius: 12 },
+  brand: {
+    marginTop: 14,
+    fontSize: 32,
+    fontWeight: '700',
+    color: colors.white,
+    textShadowColor: 'rgba(140,96,0,0.35)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  tagline: {
+    marginTop: 6,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 4,
+    color: colors.onGold,
+  },
+  card: { backgroundColor: colors.card, borderRadius: radius.lg, padding: 24, ...shadowCard },
+  title: { fontSize: 22, fontWeight: '700', color: colors.ink },
+  subtitle: { marginTop: 4, fontSize: 14, color: colors.muted, marginBottom: 8 },
+  label: { fontSize: 14, fontWeight: '600', color: colors.ink, marginTop: 12 },
   input: {
     marginTop: 6,
     borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 10,
+    borderColor: colors.line,
+    backgroundColor: colors.ground,
+    borderRadius: radius.md,
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 11,
     fontSize: 15,
-    color: '#111827',
+    color: colors.ink,
   },
-  error: { marginTop: 12, color: '#dc2626', fontSize: 14 },
+  error: { marginTop: 12, color: colors.bad, fontSize: 14 },
   button: {
     marginTop: 20,
-    backgroundColor: '#d64580',
-    borderRadius: 10,
-    paddingVertical: 12,
+    backgroundColor: colors.gold,
+    borderRadius: radius.md,
+    paddingVertical: 13,
     alignItems: 'center',
   },
-  buttonPressed: { opacity: 0.7 },
-  buttonText: { color: '#fff', fontSize: 15, fontWeight: '600' },
+  buttonPressed: { opacity: 0.75 },
+  buttonText: { color: colors.onGold, fontSize: 15, fontWeight: '700' },
 });

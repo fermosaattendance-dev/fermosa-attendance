@@ -51,7 +51,7 @@ const STATUS_BADGE: Record<LeaveStatus, string> = {
 };
 
 const inputClass =
-  'mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none';
+  'mt-1 input';
 const labelClass = 'block text-sm font-medium text-gray-700';
 const YEAR = new Date().getFullYear();
 
@@ -138,7 +138,7 @@ export function Leave() {
     <div className="mx-auto max-w-5xl">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-gray-900">Leave</h2>
+          <h2 className="text-lg font-semibold text-ink">Leave</h2>
           <p className="text-sm text-gray-500">
             Requests and balances. {canApprove ? 'Approve or reject below.' : 'View only.'}
           </p>
@@ -146,14 +146,14 @@ export function Leave() {
         <div className="flex gap-1 rounded-lg border border-gray-200 bg-white p-1 text-sm">
           <button
             onClick={() => setTab('requests')}
-            className={`rounded-md px-3 py-1.5 ${tab === 'requests' ? 'bg-brand-600 text-white' : 'text-gray-600'}`}
+            className={`rounded-md px-3 py-1.5 ${tab === 'requests' ? 'bg-brand-500 text-on-gold' : 'text-gray-600'}`}
           >
             Requests
           </button>
           {canApprove && (
             <button
               onClick={() => setTab('balances')}
-              className={`rounded-md px-3 py-1.5 ${tab === 'balances' ? 'bg-brand-600 text-white' : 'text-gray-600'}`}
+              className={`rounded-md px-3 py-1.5 ${tab === 'balances' ? 'bg-brand-500 text-on-gold' : 'text-gray-600'}`}
             >
               Balances
             </button>
@@ -184,7 +184,7 @@ export function Leave() {
                 key={s}
                 onClick={() => setStatusFilter(s)}
                 className={`rounded-lg px-3 py-1.5 text-sm ${
-                  statusFilter === s ? 'bg-brand-600 text-white' : 'border border-gray-300 text-gray-600 hover:bg-gray-100'
+                  statusFilter === s ? 'bg-brand-500 text-on-gold' : 'border border-gray-300 text-gray-600 hover:bg-gray-100'
                 }`}
               >
                 {s === 'all' ? 'All' : LEAVE_STATUS_LABELS[s as LeaveStatus]}
@@ -192,9 +192,9 @@ export function Leave() {
             ))}
           </div>
 
-          <div className="mt-3 overflow-hidden rounded-xl border border-gray-200 bg-white">
+          <div className="mt-3 overflow-hidden card">
             <table className="w-full text-left text-sm">
-              <thead className="bg-gray-50 text-gray-600">
+              <thead className="bg-ground text-muted">
                 <tr>
                   <th className="px-4 py-2 font-medium">Employee</th>
                   <th className="px-4 py-2 font-medium">Type</th>
@@ -266,7 +266,7 @@ export function Leave() {
                             </button>
                             <button
                               onClick={() => review(r.id, 'rejected')}
-                              className="rounded-lg border border-gray-300 px-2.5 py-1 text-xs text-gray-700 hover:bg-gray-100"
+                              className="btn px-2.5 py-1 text-xs"
                             >
                               Reject
                             </button>
@@ -351,7 +351,7 @@ function FileForEmployee({
     return (
       <button
         onClick={() => setOpen(true)}
-        className="mt-4 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
+        className="mt-4 btn-primary"
       >
         File leave for an employee
       </button>
@@ -359,7 +359,7 @@ function FileForEmployee({
   }
 
   return (
-    <form onSubmit={submit} className="mt-4 rounded-xl border border-gray-200 bg-white p-6">
+    <form onSubmit={submit} className="mt-4 card p-6">
       <h3 className="text-sm font-semibold text-gray-900">File leave on behalf of an employee</h3>
       <div className="mt-3 grid grid-cols-2 gap-4">
         <div>
@@ -413,14 +413,14 @@ function FileForEmployee({
         <button
           type="submit"
           disabled={busy}
-          className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+          className="btn-primary"
         >
           {busy ? 'Filing…' : 'File (pending)'}
         </button>
         <button
           type="button"
           onClick={() => setOpen(false)}
-          className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+          className="btn"
         >
           Cancel
         </button>
@@ -480,13 +480,13 @@ function BalancesTab({
   };
 
   return (
-    <div className="mt-4 overflow-hidden rounded-xl border border-gray-200 bg-white">
+    <div className="mt-4 overflow-hidden card">
       <div className="border-b border-gray-100 px-4 py-2 text-xs text-gray-500">
         {YEAR} entitlements. Used and remaining are computed from approved requests. Edit an entitlement and press
         Save. Use “Grant entitlements” on the Settings page to create rows for everyone.
       </div>
       <table className="w-full text-left text-sm">
-        <thead className="bg-gray-50 text-gray-600">
+        <thead className="bg-ground text-muted">
           <tr>
             <th className="px-4 py-2 font-medium">Employee</th>
             <th className="px-4 py-2 font-medium">Type</th>
@@ -514,7 +514,7 @@ function BalancesTab({
                   <input
                     value={draft[b.id] ?? fmtDays(b.entitled_days)}
                     onChange={(e) => setDraft((d) => ({ ...d, [b.id]: e.target.value }))}
-                    className="w-20 rounded-lg border border-gray-300 px-2 py-1 text-sm"
+                    className="w-20 input"
                   />
                 </td>
                 <td className="px-4 py-2 text-gray-700">{fmtDays(b.used_days)}</td>
@@ -525,7 +525,7 @@ function BalancesTab({
                   {dirty && (
                     <button
                       onClick={() => save(b)}
-                      className="rounded-lg bg-brand-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-brand-700"
+                      className="btn-primary px-2.5 py-1 text-xs"
                     >
                       Save
                     </button>

@@ -198,7 +198,7 @@ export default function KioskScreen() {
 
         {step.name === 'submitting' && (
           <>
-            <ActivityIndicator size="large" color="#d64580" />
+            <ActivityIndicator size="large" color="#D9A400" />
             <Text style={styles.note}>Recording punch…</Text>
           </>
         )}
@@ -247,7 +247,7 @@ export default function KioskScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#fdf2f8' },
+  safeArea: { flex: 1, backgroundColor: '#F7F6F2' },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -261,14 +261,14 @@ const styles = StyleSheet.create({
   body: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24, gap: 14 },
   bigTitle: { fontSize: 26, fontWeight: '700', color: '#111827' },
   bigBtn: {
-    backgroundColor: '#d64580',
+    backgroundColor: '#F5C518',
     borderRadius: 999,
     width: 180,
     height: 180,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  bigBtnText: { color: '#fff', fontSize: 28, fontWeight: '700' },
+  bigBtnText: { color: '#3A2D06', fontSize: 28, fontWeight: '700' },
   form: { width: '100%', maxWidth: 420, gap: 12 },
   formTitle: { fontSize: 19, fontWeight: '600', color: '#111827', textAlign: 'center', marginBottom: 6 },
   input: {
@@ -282,12 +282,12 @@ const styles = StyleSheet.create({
     color: '#111827',
   },
   primaryBtn: {
-    backgroundColor: '#d64580',
+    backgroundColor: '#F5C518',
     borderRadius: 12,
     paddingVertical: 15,
     alignItems: 'center',
   },
-  primaryText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  primaryText: { color: '#3A2D06', fontSize: 16, fontWeight: '700' },
   typeBtn: {
     backgroundColor: '#fff',
     borderWidth: 1,

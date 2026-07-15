@@ -7,6 +7,7 @@ import {
 } from '@fermosa/shared';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { PageHeader } from '../components/PageHeader';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
 
@@ -94,13 +95,14 @@ function StatCard({
     info: 'text-sky-700',
   }[tone];
   const body = (
-    <div className="rounded-xl border border-gray-200 bg-white p-4">
-      <div className={`text-2xl font-bold ${toneClass}`}>{value}</div>
-      <div className="mt-0.5 text-xs font-medium text-gray-500">{label}</div>
+    <div className={`card p-4 ${to ? 'relative transition hover:border-brand-400 hover:shadow-md' : ''}`}>
+      <div className={`tnum text-2xl font-bold ${toneClass}`}>{value}</div>
+      <div className="mt-1 text-xs font-semibold text-muted">{label}</div>
+      {to && <span className="absolute right-3 top-3 font-bold text-brand-600">→</span>}
     </div>
   );
   return to ? (
-    <Link to={to} className="block transition hover:shadow-sm">
+    <Link to={to} className="block">
       {body}
     </Link>
   ) : (
@@ -193,13 +195,11 @@ export function Overview() {
   if (!showBoard) {
     return (
       <div className="mx-auto max-w-2xl">
-        <h2 className="text-lg font-semibold text-gray-900">
-          Welcome, {profile.full_name.split(' ')[0]}
-        </h2>
-        <p className="text-sm text-gray-500">
-          {ROLE_LABELS[profile.role]} · {profile.employee_code}
-        </p>
-        <div className="mt-6 rounded-xl border border-gray-200 bg-white p-6 text-sm text-gray-600">
+        <PageHeader
+          title={`Welcome, ${profile.full_name.split(' ')[0]}`}
+          subtitle={`${ROLE_LABELS[profile.role]} · ${profile.employee_code}`}
+        />
+        <div className="card p-6 text-sm text-muted">
           Clock in and out, and file leave, from the Fermosa Attendance mobile app. This dashboard is
           for managers and HR.
         </div>
@@ -208,26 +208,22 @@ export function Overview() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl">
-      <div className="flex items-end justify-between">
-        <div>
-          <h2 className="text-lg font-semibold text-gray-900">Today</h2>
-          <p className="text-sm text-gray-500">
-            {isAdmin ? 'Company-wide' : 'Your branch'} · live status
-          </p>
-        </div>
-        <div className="flex items-center gap-3 text-xs text-gray-400">
-          {asOf && <span>as of {timeFmt.format(asOf)}</span>}
-          <button
-            onClick={load}
-            className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100"
-          >
-            Refresh
-          </button>
-        </div>
-      </div>
+    <div className="mx-auto max-w-6xl">
+      <PageHeader
+        title="Today"
+        crumb="Dashboard"
+        subtitle={`${isAdmin ? 'Company-wide' : 'Your branch'} · live status`}
+        right={
+          <>
+            {asOf && <span className="tnum text-xs text-muted">as of {timeFmt.format(asOf)}</span>}
+            <button onClick={load} className="btn">
+              Refresh
+            </button>
+          </>
+        }
+      />
 
-      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
         <StatCard label="Working" value={counts.working} tone="good" />
         <StatCard label="On break" value={counts.on_break} tone="warn" />
         <StatCard label="Not in yet" value={counts.overdue} tone="bad" />
@@ -249,26 +245,26 @@ export function Overview() {
 
       {isAdmin && perBranch.length > 1 && (
         <>
-          <h3 className="mt-8 text-base font-semibold text-gray-900">By branch</h3>
-          <div className="mt-3 overflow-hidden rounded-xl border border-gray-200 bg-white">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-gray-50 text-gray-600">
+          <h3 className="mt-8 mb-3 text-base font-semibold text-ink">By branch</h3>
+          <div className="card overflow-x-auto">
+            <table className="fm-table">
+              <thead>
                 <tr>
-                  <th className="px-4 py-2 font-medium">Branch</th>
-                  <th className="px-4 py-2 font-medium">In / on break</th>
-                  <th className="px-4 py-2 font-medium">Not in yet</th>
-                  <th className="px-4 py-2 font-medium">On leave</th>
+                  <th>Branch</th>
+                  <th>In / on break</th>
+                  <th>Not in yet</th>
+                  <th>On leave</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody>
                 {perBranch.map((b) => (
-                  <tr key={b.name} className="hover:bg-gray-50">
-                    <td className="px-4 py-2 font-medium text-gray-900">{b.name}</td>
-                    <td className="px-4 py-2 text-gray-700">{b.working}</td>
-                    <td className={`px-4 py-2 ${b.notIn ? 'font-medium text-red-600' : 'text-gray-400'}`}>
+                  <tr key={b.name}>
+                    <td className="font-semibold text-ink">{b.name}</td>
+                    <td className="tnum text-ink/80">{b.working}</td>
+                    <td className={`tnum ${b.notIn ? 'font-semibold text-red-600' : 'text-muted'}`}>
                       {b.notIn}
                     </td>
-                    <td className="px-4 py-2 text-gray-700">{b.onLeave}</td>
+                    <td className="tnum text-ink/80">{b.onLeave}</td>
                   </tr>
                 ))}
               </tbody>
@@ -277,13 +273,13 @@ export function Overview() {
         </>
       )}
 
-      <div className="mt-8 flex items-center justify-between">
-        <h3 className="text-base font-semibold text-gray-900">Roster</h3>
+      <div className="mt-8 mb-3 flex items-center justify-between gap-3">
+        <h3 className="text-base font-semibold text-ink">Roster</h3>
         {branches.length > 1 && (
           <select
             value={branchFilter}
             onChange={(e) => setBranchFilter(e.target.value)}
-            className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm"
+            className="input max-w-[220px]"
           >
             <option value="all">All branches</option>
             {branches.map(([id, name]) => (
@@ -295,51 +291,49 @@ export function Overview() {
         )}
       </div>
 
-      <div className="mt-3 overflow-hidden rounded-xl border border-gray-200 bg-white">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-gray-50 text-gray-600">
+      <div className="card overflow-x-auto">
+        <table className="fm-table">
+          <thead>
             <tr>
-              <th className="px-4 py-2 font-medium">Employee</th>
-              {branches.length > 1 && <th className="px-4 py-2 font-medium">Branch</th>}
-              <th className="px-4 py-2 font-medium">Status</th>
-              <th className="px-4 py-2 font-medium">Late</th>
-              <th className="px-4 py-2 font-medium">Last punch</th>
+              <th>Employee</th>
+              {branches.length > 1 && <th>Branch</th>}
+              <th>Status</th>
+              <th>Late</th>
+              <th>Last punch</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody>
             {loading && (
               <tr>
-                <td colSpan={5} className="px-4 py-6 text-center text-gray-400">
+                <td colSpan={5} className="text-center text-muted">
                   Loading…
                 </td>
               </tr>
             )}
             {!loading && sorted.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-6 text-center text-gray-400">
+                <td colSpan={5} className="text-center text-muted">
                   No active employees to show.
                 </td>
               </tr>
             )}
             {sorted.map((r) => (
-              <tr key={r.employee_id} className="hover:bg-gray-50">
-                <td className="px-4 py-2">
-                  <div className="font-medium text-gray-900">{r.full_name}</div>
-                  <div className="text-xs text-gray-500">{r.employee_code}</div>
+              <tr key={r.employee_id}>
+                <td>
+                  <div className="font-semibold text-ink">{r.full_name}</div>
+                  <div className="text-xs text-muted">{r.employee_code}</div>
                 </td>
-                {branches.length > 1 && <td className="px-4 py-2 text-gray-600">{r.branch_name}</td>}
-                <td className="px-4 py-2">
-                  <span className={`rounded-full px-2 py-0.5 text-xs ${STATUS_BADGE[rowKind(r)]}`}>
-                    {rowLabel(r)}
-                  </span>
+                {branches.length > 1 && <td className="text-muted">{r.branch_name}</td>}
+                <td>
+                  <span className={`pill ${STATUS_BADGE[rowKind(r)]}`}>{rowLabel(r)}</span>
                   {!r.scheduled && !r.on_leave && (
-                    <span className="ml-1.5 text-[11px] text-gray-400">rest day</span>
+                    <span className="ml-1.5 text-[11px] text-muted">rest day</span>
                   )}
                 </td>
-                <td className="px-4 py-2 text-gray-700">
+                <td className="tnum text-ink/80">
                   {r.late_minutes > 0 ? `${r.late_minutes}m` : '—'}
                 </td>
-                <td className="px-4 py-2 text-gray-500">
+                <td className="tnum text-muted">
                   {r.last_punch_at ? punchTimeFmt.format(new Date(r.last_punch_at)) : '—'}
                 </td>
               </tr>

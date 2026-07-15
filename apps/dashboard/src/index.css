@@ -1,9 +1,102 @@
 @import 'tailwindcss';
 
 @theme {
-  --color-brand-50: #fdf2f6;
-  --color-brand-100: #fce7ef;
-  --color-brand-500: #d64580;
-  --color-brand-600: #c02e6b;
-  --color-brand-700: #a01f57;
+  --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+
+  /* Fermosa brand — glossy gold */
+  --color-brand-50: #fefbea;
+  --color-brand-100: #fdf3c4;
+  --color-brand-200: #fbe68a;
+  --color-brand-300: #f8d74e;
+  --color-brand-400: #f5c518;
+  --color-brand-500: #e8b923;
+  --color-brand-600: #d9a400;
+  --color-brand-700: #b7860b;
+  --color-brand-800: #8a6508;
+
+  /* warm neutrals (chosen with a slight gold bias, not pure grey) */
+  --color-ground: #f7f6f2;
+  --color-ink: #1a1712;
+  --color-line: #eae7de;
+  --color-muted: #8a8375;
+  --color-on-gold: #3a2d06;
+}
+
+@layer base {
+  body {
+    @apply bg-ground text-ink;
+    font-feature-settings: 'cv11', 'ss01';
+  }
+  /* Digits that line up in tables / clocks */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@layer components {
+  /* Glossy gold header bar */
+  .fm-bar {
+    background: linear-gradient(180deg, #f8d24a 0%, #efc024 45%, #e3b21c 100%);
+  }
+  .fm-bar-shine {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0) 42%);
+  }
+
+  /* Buttons */
+  .btn {
+    @apply inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-line
+      bg-white px-3.5 py-2 text-sm font-semibold text-ink transition
+      hover:bg-[#faf9f5] disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    background: linear-gradient(180deg, var(--color-brand-300), var(--color-brand-500));
+    @apply cursor-pointer rounded-lg border px-3.5 py-2 text-sm font-semibold transition
+      hover:brightness-[1.03] disabled:cursor-not-allowed disabled:opacity-50;
+    border-color: var(--color-brand-600);
+    color: var(--color-on-gold);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 1px 2px rgba(120, 84, 0, 0.2);
+  }
+  .btn-danger {
+    @apply inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-transparent
+      bg-red-600 px-3.5 py-2 text-sm font-semibold text-white transition
+      hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  /* Inputs */
+  .input {
+    @apply w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink
+      transition placeholder:text-muted
+      focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-400/40;
+  }
+
+  /* Surfaces */
+  .card {
+    @apply rounded-2xl border border-line bg-white shadow-[0_1px_2px_rgba(60,46,10,0.05),0_10px_28px_-16px_rgba(60,46,10,0.16)];
+  }
+
+  /* Status pill (colour supplied per-use) — leading dot in the current colour */
+  .pill {
+    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold;
+  }
+  .pill::before {
+    content: '';
+    @apply h-1.5 w-1.5 rounded-full bg-current opacity-80;
+  }
+  .pill-plain::before {
+    display: none;
+  }
+
+  /* Table shell used across list pages */
+  .fm-table {
+    @apply w-full text-left text-sm;
+  }
+  .fm-table thead th {
+    @apply bg-ground px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-muted;
+  }
+  .fm-table tbody td {
+    @apply border-t border-line px-4 py-2.5;
+  }
+  .fm-table tbody tr:hover {
+    @apply bg-ground/60;
+  }
 }

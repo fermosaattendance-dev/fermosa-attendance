@@ -23,7 +23,7 @@ export default function SelfiePunchScreen() {
   if (saving) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#d64580" />
+        <ActivityIndicator size="large" color="#D9A400" />
         <Text style={styles.note}>Saving punch…</Text>
       </View>
     );

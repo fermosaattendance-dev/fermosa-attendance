@@ -147,9 +147,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     backgroundColor: '#fff',
   },
-  branchItemActive: { borderColor: '#d64580', backgroundColor: '#fdf2f8' },
+  branchItemActive: { borderColor: '#F5C518', backgroundColor: '#FEFBEA' },
   branchText: { fontSize: 15, color: '#374151' },
-  branchTextActive: { color: '#b03a6b', fontWeight: '600' },
+  branchTextActive: { color: '#B7860B', fontWeight: '700' },
   input: {
     borderWidth: 1,
     borderColor: '#d1d5db',
@@ -163,12 +163,12 @@ const styles = StyleSheet.create({
   error: { color: '#dc2626', fontSize: 14 },
   primaryBtn: {
     marginTop: 16,
-    backgroundColor: '#d64580',
+    backgroundColor: '#F5C518',
     borderRadius: 12,
     paddingVertical: 14,
     alignItems: 'center',
   },
-  primaryText: { color: '#fff', fontSize: 15, fontWeight: '600' },
+  primaryText: { color: '#3A2D06', fontSize: 15, fontWeight: '700' },
   linkBtn: { alignItems: 'center', padding: 10 },
   link: { fontSize: 14, color: '#6b7280' },
 });

@@ -199,22 +199,22 @@ function CorrectionForm({
         <label className="text-xs text-gray-600">
           Worked
           <input value={worked} onChange={(e) => setWorked(e.target.value.replace(/\D/g, ''))}
-            className="mt-1 block w-24 rounded-lg border border-gray-300 px-2 py-1.5 text-sm" />
+            className="mt-1 block w-24 input" />
         </label>
         <label className="text-xs text-gray-600">
           Late
           <input value={late} onChange={(e) => setLate(e.target.value.replace(/\D/g, ''))}
-            className="mt-1 block w-20 rounded-lg border border-gray-300 px-2 py-1.5 text-sm" />
+            className="mt-1 block w-20 input" />
         </label>
         <label className="text-xs text-gray-600">
           Overtime
           <input value={ot} onChange={(e) => setOt(e.target.value.replace(/\D/g, ''))}
-            className="mt-1 block w-20 rounded-lg border border-gray-300 px-2 py-1.5 text-sm" />
+            className="mt-1 block w-20 input" />
         </label>
         <label className="min-w-64 flex-1 text-xs text-gray-600">
           Reason (required)
           <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. forgot to clock out, confirmed with branch manager"
-            className="mt-1 block w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm" />
+            className="mt-1 block w-full input" />
         </label>
         <button
           onClick={() => onSave(note, {
@@ -223,11 +223,11 @@ function CorrectionForm({
             overtime_minutes: Number(ot || 0),
           })}
           disabled={!note.trim()}
-          className="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+          className="btn-primary"
         >
           Save correction
         </button>
-        <button onClick={onCancel} className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700">
+        <button onClick={onCancel} className="btn">
           Cancel
         </button>
       </div>
@@ -287,7 +287,7 @@ export function Reviews() {
     <div className="mx-auto max-w-5xl">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-gray-900">Attendance reviews</h2>
+          <h2 className="text-lg font-semibold text-ink">Attendance reviews</h2>
           <p className="text-sm text-gray-500">
             {canReview
               ? 'Only approved attendance becomes official. Rejections and corrections require a note.'
@@ -297,7 +297,7 @@ export function Reviews() {
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+          className="input"
         >
           <option value="pending_review">Pending review</option>
           <option value="approved">Approved</option>
@@ -309,9 +309,9 @@ export function Reviews() {
 
       {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
 
-      <div className="mt-4 overflow-hidden rounded-xl border border-gray-200 bg-white">
+      <div className="mt-4 overflow-hidden card">
         <table className="w-full text-left text-sm">
-          <thead className="bg-gray-50 text-gray-600">
+          <thead className="bg-ground text-muted">
             <tr>
               <th className="px-4 py-2 font-medium">Date</th>
               <th className="px-4 py-2 font-medium">Employee</th>
@@ -401,7 +401,7 @@ export function Reviews() {
                     {canReview && r.status !== 'rejected' && (
                       <button
                         onClick={() => setCorrectId(correctId === r.id ? null : r.id)}
-                        className="rounded-lg border border-gray-300 px-2.5 py-1 text-xs text-gray-700 hover:bg-gray-100"
+                        className="btn px-2.5 py-1 text-xs"
                       >
                         {correctId === r.id ? 'Close' : 'Correct'}
                       </button>

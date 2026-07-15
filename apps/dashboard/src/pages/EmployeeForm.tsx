@@ -23,7 +23,7 @@ interface Option {
 }
 
 const inputClass =
-  'mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none';
+  'mt-1 input';
 const labelClass = 'block text-sm font-medium text-gray-700';
 
 export function EmployeeForm() {
@@ -180,11 +180,11 @@ export function EmployeeForm() {
       <Link to="/employees" className="text-sm text-brand-700 hover:underline">
         ← Back to employees
       </Link>
-      <h2 className="mt-2 text-lg font-semibold text-gray-900">
+      <h2 className="mt-2 text-lg font-semibold text-ink">
         {isNew ? 'New employee' : `Edit — ${fullName}`}
       </h2>
 
-      <form onSubmit={onSubmit} className="mt-4 space-y-4 rounded-xl border border-gray-200 bg-white p-6">
+      <form onSubmit={onSubmit} className="mt-4 space-y-4 card p-6">
         {isNew && (
           <>
             <div>
@@ -210,12 +210,12 @@ export function EmployeeForm() {
                   minLength={8}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 font-mono text-sm focus:border-brand-500 focus:outline-none"
+                  className="w-full input font-mono"
                 />
                 <button
                   type="button"
                   onClick={() => setPassword(generateTempPassword())}
-                  className="whitespace-nowrap rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                  className="whitespace-nowrap btn"
                 >
                   Generate
                 </button>
@@ -291,7 +291,7 @@ export function EmployeeForm() {
         <button
           type="submit"
           disabled={busy}
-          className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+          className="btn-primary"
         >
           {busy ? 'Saving…' : isNew ? 'Create employee' : 'Save changes'}
         </button>
@@ -299,7 +299,7 @@ export function EmployeeForm() {
 
       {!isNew && (
         <div className="mt-6 grid grid-cols-2 gap-4">
-          <div className="rounded-xl border border-gray-200 bg-white p-5">
+          <div className="card p-5">
             <h3 className="text-sm font-semibold text-gray-900">Kiosk PIN</h3>
             <p className="mt-1 text-xs text-gray-500">4–6 digits, used on shared branch tablets.</p>
             <div className="mt-3 flex gap-2">
@@ -308,20 +308,20 @@ export function EmployeeForm() {
                 onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
                 placeholder="1234"
                 inputMode="numeric"
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 font-mono text-sm focus:border-brand-500 focus:outline-none"
+                className="w-full input font-mono"
               />
               <button
                 type="button"
                 onClick={onSetPin}
                 disabled={pin.length < 4}
-                className="whitespace-nowrap rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+                className="whitespace-nowrap btn"
               >
                 Set PIN
               </button>
             </div>
           </div>
 
-          <div className="rounded-xl border border-gray-200 bg-white p-5">
+          <div className="card p-5">
             <h3 className="text-sm font-semibold text-gray-900">Reset password</h3>
             <p className="mt-1 text-xs text-gray-500">Give the new password to the employee directly.</p>
             <div className="mt-3 flex gap-2">
@@ -329,13 +329,13 @@ export function EmployeeForm() {
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 placeholder="New password"
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 font-mono text-sm focus:border-brand-500 focus:outline-none"
+                className="w-full input font-mono"
               />
               <button
                 type="button"
                 onClick={onResetPassword}
                 disabled={newPassword.length < 8}
-                className="whitespace-nowrap rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+                className="whitespace-nowrap btn"
               >
                 Reset
               </button>
@@ -343,7 +343,7 @@ export function EmployeeForm() {
           </div>
 
           {me?.role === 'super_admin' && (
-            <div className="rounded-xl border border-gray-200 bg-white p-5">
+            <div className="card p-5">
               <h3 className="text-sm font-semibold text-gray-900">Reset 2FA</h3>
               <p className="mt-1 text-xs text-gray-500">
                 Clear this employee’s authenticator if they lost their device. They sign in with
@@ -352,7 +352,7 @@ export function EmployeeForm() {
               <button
                 type="button"
                 onClick={onResetMfa}
-                className="mt-3 whitespace-nowrap rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                className="mt-3 whitespace-nowrap btn"
               >
                 Reset 2FA
               </button>

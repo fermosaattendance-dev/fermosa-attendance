@@ -18,7 +18,7 @@ import { Settings } from './pages/Settings';
 
 function Loading() {
   return (
-    <div className="flex min-h-screen items-center justify-center text-sm text-gray-400">
+    <div className="flex min-h-screen items-center justify-center text-sm text-muted">
       Loading…
     </div>
   );
@@ -39,12 +39,9 @@ function RequireAuth() {
   if (needsMfaChallenge(aal)) return <MfaChallenge />;
   if (!profile) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-4 px-4 text-center text-sm text-gray-500">
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 px-4 text-center text-sm text-muted">
         <p>Your account has no employee profile yet. Ask HR to complete your registration.</p>
-        <button
-          onClick={signOut}
-          className="rounded-lg border border-gray-300 px-3 py-1.5 text-gray-700 hover:bg-gray-100"
-        >
+        <button onClick={signOut} className="btn">
           Sign out
         </button>
       </div>

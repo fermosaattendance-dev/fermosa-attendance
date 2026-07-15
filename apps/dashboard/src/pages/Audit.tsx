@@ -15,7 +15,7 @@ const fmt = (ts: string) =>
   });
 
 const inputClass =
-  'mt-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none';
+  'mt-1 input';
 const labelClass = 'block text-xs font-medium text-gray-600';
 
 export function Audit() {
@@ -83,7 +83,7 @@ export function Audit() {
     <div>
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-gray-900">Audit log</h2>
+          <h2 className="text-lg font-semibold text-ink">Audit log</h2>
           <p className="text-sm text-gray-500">
             Privileged actions across the company — account changes, reviews, corrections, and 2FA events.
           </p>
@@ -91,13 +91,13 @@ export function Audit() {
         <button
           onClick={onExport}
           disabled={rows.length === 0}
-          className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+          className="btn"
         >
           Export CSV
         </button>
       </div>
 
-      <div className="mt-4 flex flex-wrap items-end gap-3 rounded-xl border border-gray-200 bg-white p-4">
+      <div className="mt-4 flex flex-wrap items-end gap-3 card p-4">
         <div>
           <label className={labelClass}>Action</label>
           <select value={action} onChange={(e) => setAction(e.target.value)} className={inputClass}>
@@ -128,7 +128,7 @@ export function Audit() {
         </div>
         <button
           onClick={resetFilters}
-          className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100"
+          className="btn"
         >
           Clear
         </button>
@@ -136,9 +136,9 @@ export function Audit() {
 
       {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
 
-      <div className="mt-4 overflow-hidden rounded-xl border border-gray-200 bg-white">
+      <div className="mt-4 overflow-hidden card">
         <table className="w-full text-left text-sm">
-          <thead className="bg-gray-50 text-gray-600">
+          <thead className="bg-ground text-muted">
             <tr>
               <th className="px-4 py-2 font-medium">When</th>
               <th className="px-4 py-2 font-medium">Action</th>
@@ -186,7 +186,7 @@ export function Audit() {
           <button
             onClick={() => setLimit((n) => n + PAGE)}
             disabled={loading}
-            className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+            className="btn"
           >
             {loading ? 'Loading…' : 'Load more'}
           </button>

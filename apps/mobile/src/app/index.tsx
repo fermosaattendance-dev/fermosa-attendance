@@ -13,6 +13,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AppState,
   FlatList,
+  Image,
   Pressable,
   StyleSheet,
   Text,
@@ -23,6 +24,7 @@ import { pendingCount, punchesSince, type LocalPunch } from '@/lib/db';
 import { recordPunch, syncPending } from '@/lib/punchQueue';
 import { formatClock, formatDate, formatPunchTime, recentWindowStartIso } from '@/lib/time';
 import { useAuth } from '@/lib/auth';
+import { colors, logoMark } from '@/theme';
 
 const STATUS_TEXT = {
   clocked_out: { label: 'Clocked out', color: '#6b7280' },
@@ -155,11 +157,16 @@ export default function HomeScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
-        <View>
-          <Text style={styles.appName}>Fermosa Attendance</Text>
-          <Text style={styles.muted}>
-            {profile.full_name} · {branch?.name ?? 'No branch'}
-          </Text>
+        <View style={styles.brandRow}>
+          <View style={styles.logoBadge}>
+            <Image source={logoMark} style={styles.logoImg} resizeMode="contain" />
+          </View>
+          <View>
+            <Text style={styles.appName}>Fermosa</Text>
+            <Text style={styles.headerSub}>
+              {profile.full_name} · {branch?.name ?? 'No branch'}
+            </Text>
+          </View>
         </View>
         <Pressable style={styles.signOut} onPress={signOut}>
           <Text style={styles.signOutText}>Sign out</Text>
@@ -255,28 +262,45 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#f9fafb' },
+  safeArea: { flex: 1, backgroundColor: colors.ground },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24, gap: 16 },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: colors.gold,
   },
-  appName: { fontSize: 17, fontWeight: '600', color: '#111827' },
+  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  logoBadge: {
+    width: 38,
+    height: 38,
+    borderRadius: 11,
+    backgroundColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logoImg: { width: 28, height: 28, borderRadius: 8 },
+  appName: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.white,
+    textShadowColor: 'rgba(140,96,0,0.35)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 1,
+  },
+  headerSub: { fontSize: 12, color: colors.onGold, marginTop: 1 },
   muted: { fontSize: 13, color: '#6b7280', marginTop: 2 },
   signOut: {
     borderWidth: 1,
-    borderColor: '#d1d5db',
+    borderColor: 'rgba(58,45,6,0.3)',
+    backgroundColor: 'rgba(255,255,255,0.25)',
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
-  signOutText: { fontSize: 13, color: '#374151' },
+  signOutText: { fontSize: 13, fontWeight: '600', color: colors.onGold },
   body: { padding: 20, paddingBottom: 40 },
   clockCard: {
     backgroundColor: '#fff',
@@ -308,7 +332,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  syncNow: { fontSize: 13, fontWeight: '600', color: '#d64580' },
+  syncNow: { fontSize: 13, fontWeight: '600', color: colors.goldDeep },
   leaveLink: {
     marginTop: 16,
     backgroundColor: '#fff',

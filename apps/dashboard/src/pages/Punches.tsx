@@ -7,6 +7,7 @@ import {
   type PunchType,
 } from '@fermosa/shared';
 import { useCallback, useEffect, useState } from 'react';
+import { PageHeader } from '../components/PageHeader';
 import { SelfieThumb } from '../components/SelfieThumb';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
@@ -186,35 +187,28 @@ export function Punches() {
       );
     }
     return (
-      <span className={`rounded-full px-2 py-0.5 text-xs ${STATUS_BADGE[rec.status]}`}>
-        {STATUS_LABEL[rec.status]}
-      </span>
+      <span className={`pill ${STATUS_BADGE[rec.status]}`}>{STATUS_LABEL[rec.status]}</span>
     );
   };
 
   return (
     <div className="mx-auto max-w-5xl">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-semibold text-gray-900">Punches</h2>
-          <p className="text-sm text-gray-500">
-            Latest raw clock events (auto-refreshes every 10s). Approving here approves the whole day; use
-            Reviews for corrections.
-          </p>
-        </div>
-        <button
-          onClick={load}
-          className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100"
-        >
-          Refresh
-        </button>
-      </div>
+      <PageHeader
+        title="Punches"
+        crumb="Punches"
+        subtitle="Latest raw clock events (auto-refreshes every 10s). Approving here approves the whole day; use Reviews for corrections."
+        right={
+          <button onClick={load} className="btn">
+            Refresh
+          </button>
+        }
+      />
 
       {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
 
-      <div className="mt-4 overflow-hidden rounded-xl border border-gray-200 bg-white">
+      <div className="card mt-4 overflow-x-auto">
         <table className="w-full text-left text-sm">
-          <thead className="bg-gray-50 text-gray-600">
+          <thead className="bg-ground text-muted">
             <tr>
               <th className="px-4 py-2 font-medium">Selfie</th>
               <th className="px-4 py-2 font-medium">When (Manila)</th>
