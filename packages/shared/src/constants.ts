@@ -1,4 +1,4 @@
-import type { LeaveStatus, PunchType, Role } from './types';
+import type { LeaveStatus, LiveStatus, PunchType, Role } from './types';
 
 export const DEFAULT_TIMEZONE = 'Asia/Manila';
 
@@ -25,6 +25,13 @@ export const LEAVE_STATUS_LABELS: Record<LeaveStatus, string> = {
   approved: 'Approved',
   rejected: 'Rejected',
   cancelled: 'Cancelled',
+};
+
+export const LIVE_STATUS_LABELS: Record<LiveStatus, string> = {
+  working: 'Working',
+  on_break: 'On break',
+  clocked_out: 'Done',
+  not_in: 'Not in',
 };
 
 export const ROLE_LABELS: Record<Role, string> = {

@@ -25,6 +25,26 @@ export type AttendanceFlag = 'on_time' | 'late' | 'early_out' | 'no_clock_out' |
 /** Single-step approval (product decision 2026-07-15): HR+ approve directly. */
 export type LeaveStatus = 'pending' | 'approved' | 'rejected' | 'cancelled';
 
+/** An employee's live status right now, from their latest punch this work day. */
+export type LiveStatus = 'working' | 'on_break' | 'clocked_out' | 'not_in';
+
+/** A row of the dashboard_live() RPC — one active employee's current state. */
+export interface LiveRosterRow {
+  employee_id: string;
+  full_name: string;
+  employee_code: string;
+  branch_id: string;
+  branch_name: string;
+  status: LiveStatus;
+  scheduled: boolean;
+  on_leave: boolean;
+  overdue: boolean; // scheduled, no punch yet, past shift start + grace
+  late_minutes: number;
+  first_in: string | null;
+  last_punch_at: string | null;
+  work_date: string;
+}
+
 export interface LeaveType {
   id: string;
   company_id: string;
