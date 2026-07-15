@@ -3,7 +3,9 @@ import {
   formatPeriodLabel,
   payPeriodFor,
   semiMonthlyPeriods,
+  type PayPeriod,
   type PayrollSummaryRow,
+  type PayrollSyncLog,
 } from '@fermosa/shared';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../lib/auth';
@@ -476,6 +478,129 @@ export function Reports() {
           </tbody>
         </table>
       </div>
+
+      {reportType === 'payroll' && isCompanyWide && (
+        <PayrollSyncPanel period={period} branchId={branchId} rowCount={table.rows.length} />
+      )}
+    </div>
+  );
+}
+
+function PayrollSyncPanel({ period, branchId, rowCount }: { period: PayPeriod; branchId: string; rowCount: number }) {
+  const [dryRun, setDryRun] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [recent, setRecent] = useState<PayrollSyncLog[]>([]);
+
+  const loadRecent = useCallback(() => {
+    supabase
+      .from('payroll_syncs')
+      .select('*')
+      .order('synced_at', { ascending: false })
+      .limit(8)
+      .then(({ data }) => setRecent((data as PayrollSyncLog[]) ?? []));
+  }, []);
+
+  useEffect(() => {
+    loadRecent();
+  }, [loadRecent]);
+
+  const sync = async () => {
+    setBusy(true);
+    setError(null);
+    setResult(null);
+    const { data, error: err } = await supabase.functions.invoke('payroll-sync', {
+      body: {
+        period_start: period.start,
+        period_end: period.end,
+        branch_id: branchId || null,
+        sheet_tab: formatPeriodLabel(period),
+        dry_run: dryRun,
+      },
+    });
+    setBusy(false);
+    if (err) {
+      setError(err.message);
+      return;
+    }
+    if (data?.ok) {
+      setResult(
+        data.dryRun
+          ? `Dry run — ${data.rowCount} row(s) prepared for tab “${data.tab}” (${data.reason}). No sheet written.`
+          : `Synced ${data.rowCount} row(s) to tab “${data.tab}”.`,
+      );
+    } else {
+      setError(data?.error ?? 'Sync failed.');
+    }
+    loadRecent();
+  };
+
+  return (
+    <div className="mt-6 rounded-xl border border-gray-200 bg-white p-4">
+      <h3 className="text-sm font-semibold text-gray-900">Payroll sync → Google Sheets</h3>
+      <p className="mt-0.5 text-xs text-gray-500">
+        Pushes the approved payroll rows for {formatPeriodLabel(period)} to the tab “{formatPeriodLabel(period)}”.
+        Re-syncing overwrites that tab. Runs as a dry run until Google credentials are configured.
+      </p>
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        <button
+          onClick={sync}
+          disabled={busy}
+          className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+        >
+          {busy ? 'Syncing…' : dryRun ? 'Dry-run sync' : 'Sync to Google Sheets'}
+        </button>
+        <label className="flex items-center gap-2 text-sm text-gray-700">
+          <input type="checkbox" checked={dryRun} onChange={(e) => setDryRun(e.target.checked)} />
+          Dry run (don’t write to the sheet)
+        </label>
+        <span className="text-xs text-gray-400">{rowCount} row(s) in view</span>
+      </div>
+      {result && <p className="mt-2 text-sm text-green-700">{result}</p>}
+      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+
+      {recent.length > 0 && (
+        <div className="mt-4">
+          <div className="text-xs font-medium text-gray-500">Recent syncs</div>
+          <table className="mt-1 w-full text-left text-xs">
+            <thead className="text-gray-500">
+              <tr>
+                <th className="py-1 pr-3 font-medium">When</th>
+                <th className="py-1 pr-3 font-medium">Period</th>
+                <th className="py-1 pr-3 font-medium">Tab</th>
+                <th className="py-1 pr-3 font-medium">Rows</th>
+                <th className="py-1 pr-3 font-medium">Status</th>
+              </tr>
+            </thead>
+            <tbody className="text-gray-600">
+              {recent.map((s) => (
+                <tr key={s.id} className="border-t border-gray-100">
+                  <td className="py-1 pr-3">{new Date(s.synced_at).toLocaleString('en-PH', { timeZone: 'Asia/Manila' })}</td>
+                  <td className="py-1 pr-3">
+                    {s.period_start} → {s.period_end}
+                  </td>
+                  <td className="py-1 pr-3">{s.sheet_tab}</td>
+                  <td className="py-1 pr-3">{s.row_count}</td>
+                  <td className="py-1 pr-3">
+                    <span
+                      className={`rounded-full px-2 py-0.5 ${
+                        s.status === 'synced'
+                          ? 'bg-green-100 text-green-700'
+                          : s.status === 'failed'
+                            ? 'bg-red-100 text-red-700'
+                            : 'bg-gray-100 text-gray-600'
+                      }`}
+                    >
+                      {s.status}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

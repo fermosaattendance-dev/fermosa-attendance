@@ -103,6 +103,26 @@ export interface PayrollSummaryRow {
   holidays_worked: number;
 }
 
+/** Status of a payroll → Google Sheets push. */
+export type PayrollSyncStatus = 'synced' | 'dry_run' | 'failed';
+
+/** One row of public.payroll_syncs — the log of Google Sheets pushes. */
+export interface PayrollSyncLog {
+  id: string;
+  company_id: string;
+  period_start: string; // 'YYYY-MM-DD'
+  period_end: string;
+  branch_id: string | null; // null = all branches
+  sheet_id: string | null;
+  sheet_tab: string;
+  row_count: number;
+  checksum: string | null;
+  status: PayrollSyncStatus;
+  error: string | null;
+  synced_by: string | null;
+  synced_at: string;
+}
+
 export interface Company {
   id: string;
   name: string;
