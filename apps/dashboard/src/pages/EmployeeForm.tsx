@@ -294,11 +294,15 @@ export function EmployeeForm() {
           <div>
             <label className={labelClass}>Branch</label>
             <select value={branchId} onChange={(e) => setBranchId(e.target.value)} className={inputClass}>
-              <option value="">— none —</option>
+              <option value="">— none (roving — picks branch at time-in) —</option>
               {branches.map((b) => (
                 <option key={b.id} value={b.id}>{b.name}</option>
               ))}
             </select>
+            <p className="mt-1 text-xs text-gray-500">
+              No branch = roving/supervisor staff: they choose which branch they're at each time
+              they time in, and the geofence checks the branch they pick.
+            </p>
           </div>
           <div>
             <label className={labelClass}>Department</label>

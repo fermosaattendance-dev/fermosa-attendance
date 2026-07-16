@@ -12,6 +12,7 @@ import { Link } from 'react-router-dom';
 import { PageHeader } from '../components/PageHeader';
 import { WebcamCapture } from '../components/WebcamCapture';
 import { useAuth } from '../lib/auth';
+import { readRovingBranch, writeRovingBranch } from '../lib/rovingBranch';
 import { supabase } from '../lib/supabase';
 import { hydrateFromServer, recordPunch, syncPending } from '../lib/webPunch';
 import { pendingCount, punchesSince, type LocalPunch, type LocalSyncStatus } from '../lib/webPunchDb';
@@ -86,6 +87,12 @@ export function TimeClock() {
   const [note, setNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selfieFor, setSelfieFor] = useState<PunchType | null>(null);
+  // Roving employees (no home branch) pick which branch they're at.
+  const [branchOptions, setBranchOptions] = useState<{ id: string; name: string }[]>([]);
+  const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
+
+  const isRoving = !!profile && profile.branch_id === null;
+  const effectiveBranchId = profile?.branch_id ?? selectedBranchId;
 
   // Live clock.
   useEffect(() => {
@@ -146,16 +153,64 @@ export function TimeClock() {
     return () => clearInterval(t);
   }, [pending, refresh]);
 
+  // Roving: restore the remembered branch choice (renders even offline).
+  useEffect(() => {
+    if (!profile || profile.branch_id !== null) return;
+    const remembered = readRovingBranch(profile.id);
+    if (remembered) {
+      setSelectedBranchId(remembered.id);
+      setBranchOptions((opts) => (opts.length ? opts : [remembered]));
+    }
+  }, [profile]);
+
+  // Roving: load the active branch list to pick from (any company member may
+  // read branches under RLS). A remembered branch that was deactivated is cleared.
+  useEffect(() => {
+    if (!isRoving || !profile || !navigator.onLine) return;
+    supabase
+      .from('branches')
+      .select('id, name')
+      .eq('is_active', true)
+      .order('name')
+      .then(({ data }) => {
+        const opts = (data as { id: string; name: string }[] | null) ?? [];
+        if (!opts.length) return;
+        setBranchOptions(opts);
+        setSelectedBranchId((sel) => {
+          if (sel && !opts.some((o) => o.id === sel)) {
+            writeRovingBranch(profile.id, null);
+            return null;
+          }
+          return sel;
+        });
+      });
+  }, [isRoving, profile]);
+
+  const pickBranch = (id: string | null) => {
+    if (!profile) return;
+    setSelectedBranchId(id);
+    if (id) {
+      const opt = branchOptions.find((o) => o.id === id);
+      writeRovingBranch(profile.id, opt ? { id: opt.id, name: opt.name } : null);
+    } else {
+      writeRovingBranch(profile.id, null);
+    }
+  };
+
   // Branch coordinates for the instant geofence hint (server stays authoritative).
   useEffect(() => {
-    if (!profile?.branch_id || !navigator.onLine) return;
+    if (!effectiveBranchId) {
+      setBranch(null);
+      return;
+    }
+    if (!navigator.onLine) return;
     supabase
       .from('branches')
       .select('id, name, lat, lng, geofence_radius_m')
-      .eq('id', profile.branch_id)
+      .eq('id', effectiveBranchId)
       .maybeSingle()
       .then(({ data }) => setBranch((data as BranchInfo | null) ?? null));
-  }, [profile?.branch_id]);
+  }, [effectiveBranchId]);
 
   const lastType: PunchType | null = punches.at(-1)?.type ?? null;
   const workStatus = workStatusFromLastPunch(lastType);
@@ -170,11 +225,16 @@ export function TimeClock() {
   const doPunch = useCallback(
     async (type: PunchType, selfieB64: string | null) => {
       if (!profile) return;
+      const branchId = profile.branch_id ?? selectedBranchId;
+      if (!branchId) {
+        setError('Pick the branch you are working at first.');
+        return;
+      }
       setBusy(true);
       setError(null);
       setNote(null);
       try {
-        const { gps } = await recordPunch({ profile, branchId: profile.branch_id, type, selfieB64 });
+        const { gps } = await recordPunch({ profile, branchId, type, selfieB64 });
         if (!navigator.onLine) {
           setNote(
             `${PUNCH_LABELS[type]} saved on this device — it will sync automatically when you're back online.`,
@@ -197,7 +257,7 @@ export function TimeClock() {
       }
       setBusy(false);
     },
-    [profile, branch, refreshLocal],
+    [profile, branch, selectedBranchId, refreshLocal],
   );
 
   const onAction = (type: PunchType) => {
@@ -229,12 +289,37 @@ export function TimeClock() {
         <span className={`pill mt-4 ${STATUS_STYLE[workStatus]}`}>{STATUS_LABEL[workStatus]}</span>
       </div>
 
+      {isRoving && (
+        <div className="card mt-4 px-4 py-4">
+          <label className="text-sm">
+            <span className="block text-xs font-medium text-gray-500">Which branch are you at today?</span>
+            <select
+              value={selectedBranchId ?? ''}
+              onChange={(e) => pickBranch(e.target.value || null)}
+              className="mt-1 input w-full"
+            >
+              <option value="">— select a branch —</option>
+              {branchOptions.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          {!selectedBranchId && (
+            <p className="mt-2 text-xs text-amber-700">
+              Pick the branch you're working at to enable Time in / Time out.
+            </p>
+          )}
+        </div>
+      )}
+
       <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
         {allowed.map((type) => (
           <button
             key={type}
             onClick={() => onAction(type)}
-            disabled={busy}
+            disabled={busy || (isRoving && !selectedBranchId)}
             className={`rounded-2xl py-5 text-lg font-bold text-white transition disabled:opacity-50 ${
               type === 'clock_in'
                 ? 'bg-green-600 hover:bg-green-700'

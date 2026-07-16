@@ -33,8 +33,9 @@ export interface LiveRosterRow {
   employee_id: string;
   full_name: string;
   employee_code: string;
-  branch_id: string;
-  branch_name: string;
+  /** Null = roving employee (no home branch) who hasn't punched yet today. */
+  branch_id: string | null;
+  branch_name: string | null;
   status: LiveStatus;
   scheduled: boolean;
   on_leave: boolean;
@@ -241,7 +242,8 @@ export interface QueuedPunch {
   lng: number | null;
   gps_accuracy_m: number | null;
   selfie_local_uri: string | null;
-  branch_id: string;
+  /** Null only transiently for a roving employee's queue row (both queues store it per punch). */
+  branch_id: string | null;
   sync_status: 'pending_sync' | 'syncing' | 'synced' | 'failed';
   attempts: number;
 }

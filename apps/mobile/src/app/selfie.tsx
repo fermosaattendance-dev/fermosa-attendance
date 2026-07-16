@@ -8,7 +8,7 @@ import { recordPunch } from '@/lib/punchQueue';
 
 /** Selfie step for clock in/out in personal mode. */
 export default function SelfiePunchScreen() {
-  const { type } = useLocalSearchParams<{ type: PunchType }>();
+  const { type, branchId } = useLocalSearchParams<{ type: PunchType; branchId?: string }>();
   const { branch } = useAuth();
   const [saving, setSaving] = useState(false);
 
@@ -16,7 +16,9 @@ export default function SelfiePunchScreen() {
 
   const onCapture = async (selfieB64: string | null) => {
     setSaving(true);
-    await recordPunch(punchType, branch?.id ?? null, selfieB64);
+    // branchId param carries a roving employee's picked branch; the home
+    // branch stays the fallback for regular employees.
+    await recordPunch(punchType, branchId || branch?.id || null, selfieB64);
     router.back();
   };
 

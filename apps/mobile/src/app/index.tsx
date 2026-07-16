@@ -21,10 +21,11 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { pendingCount, punchesSince, type LocalPunch } from '@/lib/db';
+import { kvGetSync, kvRemoveSync, kvSetSync, pendingCount, punchesSince, type LocalPunch } from '@/lib/db';
 import { recordPunch, syncPending } from '@/lib/punchQueue';
+import { supabase } from '@/lib/supabase';
 import { formatClock, formatDate, formatPunchTime, recentWindowStartIso } from '@/lib/time';
-import { useAuth } from '@/lib/auth';
+import { useAuth, type BranchSummary } from '@/lib/auth';
 import { colors, logoMark } from '@/theme';
 
 const STATUS_TEXT = {
@@ -48,6 +49,58 @@ export default function HomeScreen() {
   const [busy, setBusy] = useState(false);
   const [lastGpsNote, setLastGpsNote] = useState<string | null>(null);
   const online = useRef(true);
+  // Roving employees (no home branch) pick which branch they're at; the
+  // choice is remembered on this device (coords included, so the geofence
+  // hint works offline).
+  const [rovingBranch, setRovingBranch] = useState<BranchSummary | null>(null);
+  const [branchOptions, setBranchOptions] = useState<BranchSummary[]>([]);
+  const [pickerOpen, setPickerOpen] = useState(false);
+
+  const isRoving = !!profile && !profile.branch_id;
+  const activeBranch = branch ?? rovingBranch;
+
+  // Restore the remembered roving branch (works offline).
+  useEffect(() => {
+    if (!profile || profile.branch_id) return;
+    const raw = kvGetSync(`roving_branch.${profile.id}`);
+    if (!raw) return;
+    try {
+      const b = JSON.parse(raw) as BranchSummary;
+      if (b?.id) setRovingBranch(b);
+    } catch {
+      // corrupt value — user just picks again
+    }
+  }, [profile]);
+
+  // Load the active branch list to pick from; drop a remembered branch that
+  // has been deactivated.
+  useEffect(() => {
+    if (!isRoving || !profile) return;
+    supabase
+      .from('branches')
+      .select('id, name, address, geofence_radius_m, lat, lng, timezone')
+      .eq('is_active', true)
+      .order('name')
+      .then(({ data }) => {
+        const opts = (data as BranchSummary[] | null) ?? [];
+        if (!opts.length) return;
+        setBranchOptions(opts);
+        setRovingBranch((cur) => {
+          if (cur && !opts.some((o) => o.id === cur.id)) {
+            kvRemoveSync(`roving_branch.${profile.id}`);
+            return null;
+          }
+          return cur;
+        });
+      });
+  }, [isRoving, profile]);
+
+  const pickRovingBranch = (b: BranchSummary) => {
+    if (!profile) return;
+    setRovingBranch(b);
+    kvSetSync(`roving_branch.${profile.id}`, JSON.stringify(b));
+    setPickerOpen(false);
+  };
 
   const refresh = useCallback(() => {
     // Rolling window (not the calendar day) so an overnight shift keeps its
@@ -120,21 +173,22 @@ export default function HomeScreen() {
 
   const onPunch = async (type: PunchType) => {
     if (busy) return;
+    if (isRoving && !activeBranch) return; // must pick a branch first
     // Clock in/out require a selfie: hand off to the camera screen, which
     // records the punch itself. Breaks stay one-tap.
     if (SELFIE_PUNCH_TYPES.includes(type)) {
-      router.push({ pathname: '/selfie', params: { type } });
+      router.push({ pathname: '/selfie', params: { type, branchId: activeBranch?.id ?? '' } });
       return;
     }
     setBusy(true);
     try {
-      const { gps } = await recordPunch(type, branch?.id ?? null);
-      if (gps && branch) {
-        const fence = checkGeofence(gps.lat, gps.lng, branch.lat, branch.lng, branch.geofence_radius_m);
+      const { gps } = await recordPunch(type, activeBranch?.id ?? null);
+      if (gps && activeBranch) {
+        const fence = checkGeofence(gps.lat, gps.lng, activeBranch.lat, activeBranch.lng, activeBranch.geofence_radius_m);
         setLastGpsNote(
           fence.inside
-            ? `Inside ${branch.name} geofence (${Math.round(fence.distanceM)} m from center)`
-            : `⚠️ ${Math.round(fence.distanceM)} m from ${branch.name} — outside geofence, HR will review`,
+            ? `Inside ${activeBranch.name} geofence (${Math.round(fence.distanceM)} m from center)`
+            : `⚠️ ${Math.round(fence.distanceM)} m from ${activeBranch.name} — outside geofence, HR will review`,
         );
       } else {
         setLastGpsNote('No GPS fix — punch saved, location review by HR');
@@ -172,7 +226,7 @@ export default function HomeScreen() {
           <View>
             <Text style={styles.appName}>Fermosa</Text>
             <Text style={styles.headerSub}>
-              {profile.full_name} · {branch?.name ?? 'No branch'}
+              {profile.full_name} · {activeBranch?.name ?? (isRoving ? 'Pick a branch' : 'No branch')}
             </Text>
           </View>
         </View>
@@ -195,18 +249,54 @@ export default function HomeScreen() {
               </View>
             </View>
 
+            {isRoving && (
+              <View style={styles.rovingCard}>
+                {rovingBranch && !pickerOpen ? (
+                  <View style={styles.rovingRow}>
+                    <Text style={styles.rovingLabel}>
+                      📍 Working at: <Text style={styles.rovingName}>{rovingBranch.name}</Text>
+                    </Text>
+                    <Pressable onPress={() => setPickerOpen(true)} hitSlop={10}>
+                      <Text style={styles.rovingChange}>Change</Text>
+                    </Pressable>
+                  </View>
+                ) : (
+                  <>
+                    <Text style={styles.rovingTitle}>Which branch are you at today?</Text>
+                    {branchOptions.length === 0 && (
+                      <Text style={styles.muted}>
+                        Connect to the internet once to load the branch list.
+                      </Text>
+                    )}
+                    {branchOptions.map((b) => (
+                      <Pressable
+                        key={b.id}
+                        onPress={() => pickRovingBranch(b)}
+                        style={[
+                          styles.branchOption,
+                          rovingBranch?.id === b.id && styles.branchOptionActive,
+                        ]}
+                      >
+                        <Text style={styles.branchOptionText}>{b.name}</Text>
+                      </Pressable>
+                    ))}
+                  </>
+                )}
+              </View>
+            )}
+
             <View style={styles.actions}>
               {allowed.map((type) => (
                 <Pressable
                   key={type}
                   onPress={() => onPunch(type)}
-                  disabled={busy}
+                  disabled={busy || (isRoving && !rovingBranch)}
                   style={({ pressed }) => [
                     styles.actionBtn,
                     type === 'clock_in' && styles.btnIn,
                     type === 'clock_out' && styles.btnOut,
                     (type === 'break_start' || type === 'break_end') && styles.btnBreak,
-                    (pressed || busy) && { opacity: 0.6 },
+                    (pressed || busy || (isRoving && !rovingBranch)) && { opacity: 0.6 },
                   ]}
                 >
                   <Text style={styles.actionText}>{busy ? '…' : PUNCH_LABELS[type]}</Text>
@@ -322,6 +412,29 @@ const styles = StyleSheet.create({
   date: { fontSize: 14, color: '#6b7280', marginTop: 4 },
   statusPill: { marginTop: 12, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 5 },
   statusText: { fontSize: 14, fontWeight: '600' },
+  rovingCard: {
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    padding: 14,
+    marginTop: 16,
+    gap: 8,
+  },
+  rovingRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  rovingLabel: { fontSize: 14, color: '#374151' },
+  rovingName: { fontWeight: '700', color: '#111827' },
+  rovingChange: { fontSize: 13, fontWeight: '600', color: colors.goldDeep },
+  rovingTitle: { fontSize: 15, fontWeight: '600', color: '#111827' },
+  branchOption: {
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+  },
+  branchOptionActive: { borderColor: colors.gold, backgroundColor: '#FEFBEA' },
+  branchOptionText: { fontSize: 15, fontWeight: '500', color: '#111827' },
   actions: { flexDirection: 'row', gap: 12, marginTop: 16 },
   actionBtn: {
     flex: 1,

@@ -147,7 +147,8 @@ export function Overview() {
 
   const branches = useMemo(() => {
     const m = new Map<string, string>();
-    for (const r of roster) m.set(r.branch_id, r.branch_name);
+    // Null branch = roving employee who hasn't punched at a branch yet today.
+    for (const r of roster) if (r.branch_id && r.branch_name) m.set(r.branch_id, r.branch_name);
     return [...m.entries()].sort((a, b) => a[1].localeCompare(b[1]));
   }, [roster]);
 
@@ -181,6 +182,7 @@ export function Overview() {
   const perBranch = useMemo(() => {
     const m = new Map<string, { name: string; working: number; notIn: number; onLeave: number }>();
     for (const r of roster) {
+      if (!r.branch_id || !r.branch_name) continue; // roving, not at a branch yet
       const e = m.get(r.branch_id) ?? { name: r.branch_name, working: 0, notIn: 0, onLeave: 0 };
       if (r.on_leave) e.onLeave += 1;
       else if (r.overdue) e.notIn += 1;
@@ -323,10 +325,10 @@ export function Overview() {
                   <div className="font-semibold text-ink">{r.full_name}</div>
                   <div className="text-xs text-muted">{r.employee_code}</div>
                 </td>
-                {branches.length > 1 && <td className="text-muted">{r.branch_name}</td>}
+                {branches.length > 1 && <td className="text-muted">{r.branch_name ?? '—'}</td>}
                 <td>
                   <span className={`pill ${STATUS_BADGE[rowKind(r)]}`}>{rowLabel(r)}</span>
-                  {!r.scheduled && !r.on_leave && (
+                  {r.branch_id && !r.scheduled && !r.on_leave && (
                     <span className="ml-1.5 text-[11px] text-muted">rest day</span>
                   )}
                 </td>

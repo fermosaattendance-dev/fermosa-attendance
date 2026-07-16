@@ -1,4 +1,5 @@
 import type { Profile, PunchType } from '@fermosa/shared';
+import { readRovingBranch } from './rovingBranch';
 import { supabase } from './supabase';
 import {
   insertPunch,
@@ -122,11 +123,17 @@ export async function syncPending(profile: Profile): Promise<{ synced: number; f
         selfiePath = path;
       }
 
+      // A roving employee (no home branch) may have queued a branchless punch
+      // on a stale app bundle; the server rejects those, so backfill their
+      // remembered branch selection.
+      const branchId =
+        row.branch_id ?? (profile.branch_id ? null : (readRovingBranch(profile.id)?.id ?? null));
+
       const { data, error } = await supabase.rpc('ingest_punch', {
         p_client_uuid: row.client_uuid,
         p_type: row.type,
         p_happened_at: row.happened_at,
-        p_branch_id: row.branch_id,
+        p_branch_id: branchId,
         p_lat: row.lat,
         p_lng: row.lng,
         p_gps_accuracy_m: row.gps_accuracy_m,
