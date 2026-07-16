@@ -44,7 +44,9 @@ function Landing() {
 function RequireAuth() {
   const { session, profile, aal, aalLoading, loading, signOut } = useAuth();
   if (loading) return <Loading />;
-  if (!session) return <Navigate to="/login" replace />;
+  // A cached profile without a session = offline mode after a browser restart:
+  // the clock stays usable; the real session restores itself on reconnect.
+  if (!session && !profile) return <Navigate to="/login" replace />;
   if (aalLoading) return <Loading />;
   if (needsMfaChallenge(aal)) return <MfaChallenge />;
   if (!profile) {

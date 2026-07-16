@@ -29,9 +29,38 @@ const AuthContext = createContext<AuthState>({
   refreshAal: async () => {},
 });
 
+/**
+ * Locally cached profile so the time clock survives an offline cold start:
+ * after a browser restart in airplane mode the stored access token can't be
+ * refreshed (session comes back null) and the profiles fetch can't run — the
+ * cache keeps the employee "signed in offline". Cleared on real sign-out;
+ * refreshed on every successful fetch.
+ */
+const PROFILE_CACHE_KEY = 'fermosa.cached_profile';
+
+function readCachedProfile(): Profile | null {
+  try {
+    const raw = localStorage.getItem(PROFILE_CACHE_KEY);
+    if (!raw) return null;
+    const p = JSON.parse(raw) as Profile;
+    return p && typeof p.id === 'string' ? p : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedProfile(p: Profile | null): void {
+  try {
+    if (p) localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(p));
+    else localStorage.removeItem(PROFILE_CACHE_KEY);
+  } catch {
+    // Storage unavailable — offline restarts just won't be covered.
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
-  const [profile, setProfile] = useState<Profile | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(() => readCachedProfile());
   // undefined = not yet determined; null = no session / not applicable.
   const [aal, setAal] = useState<Aal | null | undefined>(undefined);
   const [loading, setLoading] = useState(true);
@@ -44,10 +73,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setAal(null);
       }
     });
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, newSession) => {
       setSession(newSession);
-      if (!newSession) {
+      if (event === 'SIGNED_OUT') {
+        writeCachedProfile(null);
         setProfile(null);
+        setAal(null);
+        setLoading(false);
+      } else if (!newSession) {
+        // Null session without an explicit sign-out (e.g. a token refresh that
+        // failed while offline): keep the cached profile so the clock stays
+        // usable — the session restores itself on reconnect.
         setAal(null);
         setLoading(false);
       }
@@ -55,21 +91,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => sub.subscription.unsubscribe();
   }, []);
 
+  // When connectivity returns, nudge supabase to restore/refresh the stored
+  // session (an offline cold boot leaves it unrefreshed).
+  useEffect(() => {
+    const onOnline = () => {
+      void supabase.auth.getSession().then(({ data }) => {
+        if (data.session) setSession(data.session);
+      });
+    };
+    window.addEventListener('online', onOnline);
+    return () => window.removeEventListener('online', onOnline);
+  }, []);
+
   // Profile — keyed on user id (stable across token refreshes).
   useEffect(() => {
     if (!session) return;
     let cancelled = false;
-    setLoading(true);
+    const cached = readCachedProfile();
+    if (!cached || cached.id !== session.user.id) {
+      // No usable cache for this user — show the loading state while fetching.
+      setProfile(null);
+      setLoading(true);
+    }
     supabase
       .from('profiles')
       .select('*')
       .eq('id', session.user.id)
       .single()
-      .then(({ data }) => {
-        if (!cancelled) {
-          setProfile(data as Profile | null);
-          setLoading(false);
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        if (data) {
+          const p = data as Profile;
+          setProfile(p);
+          writeCachedProfile(p);
+        } else if (error?.code === 'PGRST116') {
+          // Definitive answer: this account has no profile row.
+          setProfile(null);
+          writeCachedProfile(null);
         }
+        // Any other error (offline/network): keep the cached profile.
+        setLoading(false);
       });
     return () => {
       cancelled = true;
@@ -96,6 +157,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
+    // Clear the offline cache up front — signOut's network call can fail
+    // offline, and a signed-out device must not keep the clock usable.
+    writeCachedProfile(null);
+    setProfile(null);
     await supabase.auth.signOut();
   };
 

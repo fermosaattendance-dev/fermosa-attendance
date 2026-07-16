@@ -96,7 +96,7 @@ function recentWindowStartIso(hours = 18): string {
  * queue, punches always save locally and sync in the background.
  */
 export function TimeClock() {
-  const { profile } = useAuth();
+  const { profile, session } = useAuth();
   const [now, setNow] = useState(() => new Date());
   const [branch, setBranch] = useState<BranchInfo | null>(null);
   const [punches, setPunches] = useState<LocalPunch[]>([]);
@@ -377,6 +377,16 @@ export function TimeClock() {
       {!online && (
         <p className="mb-4 rounded-xl bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
           📡 You're offline — punches are saved on this device and will sync when you reconnect.
+        </p>
+      )}
+
+      {online && !session && pending > 0 && (
+        <p className="mb-4 rounded-xl bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
+          You're back online —{' '}
+          <Link to="/login" className="underline">
+            sign in again
+          </Link>{' '}
+          to send your saved punches.
         </p>
       )}
 
