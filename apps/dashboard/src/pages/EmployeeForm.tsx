@@ -91,11 +91,28 @@ export function EmployeeForm() {
     e.preventDefault();
     setError(null);
     setNotice(null);
+
+    const username = email.trim();
+    if (isNew) {
+      // A username becomes <username>@fermosa.local; a real email is used as-is.
+      const valid = username.includes('@')
+        ? /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(username)
+        : /^[a-zA-Z0-9._+-]+$/.test(username);
+      if (!valid) {
+        setError(
+          username.includes('@')
+            ? 'That email looks invalid — check the format (e.g. name@example.com).'
+            : 'Username can only use letters, numbers, and . _ - (no spaces). Try e.g. mae.navarro.',
+        );
+        return;
+      }
+    }
+
     setBusy(true);
 
     if (isNew) {
       const res = await createEmployee({
-        email,
+        email: username,
         password,
         full_name: fullName,
         employee_code: employeeCode,
@@ -199,7 +216,8 @@ export function EmployeeForm() {
                 className={inputClass}
               />
               <p className="mt-1 text-xs text-gray-500">
-                No email needed — the employee signs in with this. A real email works too.
+                No email needed — letters, numbers and dots only, no spaces (e.g. mae.navarro).
+                A real email works too.
               </p>
             </div>
             <div>
