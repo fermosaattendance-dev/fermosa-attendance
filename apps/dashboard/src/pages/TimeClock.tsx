@@ -7,14 +7,22 @@ import {
   workStatusFromLastPunch,
   type PunchType,
 } from '@fermosa/shared';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PageHeader } from '../components/PageHeader';
 import { WebcamCapture } from '../components/WebcamCapture';
 import { useAuth } from '../lib/auth';
 import { readRovingBranch, writeRovingBranch } from '../lib/rovingBranch';
 import { supabase } from '../lib/supabase';
-import { hydrateFromServer, recordPunch, syncPending } from '../lib/webPunch';
+import {
+  getRequiredLocation,
+  hydrateFromServer,
+  recordPunch,
+  syncPending,
+  type GpsFix,
+  type LocationFailure,
+  type RequiredLocation,
+} from '../lib/webPunch';
 import { pendingCount, punchesSince, type LocalPunch, type LocalSyncStatus } from '../lib/webPunchDb';
 
 interface BranchInfo {
@@ -36,6 +44,17 @@ const STATUS_LABEL = {
   working: 'Working',
   on_break: 'On break',
 } as const;
+
+const LOCATION_HELP: Record<LocationFailure, string> = {
+  denied:
+    "Allow location for this site (tap the lock or settings icon in your browser's address bar → Location → Allow), then try again.",
+  unavailable:
+    'Couldn’t get your location — turn on Location on your device, move near a window, and try again.',
+  timeout:
+    'Couldn’t get your location — turn on Location on your device, move near a window, and try again.',
+  insecure:
+    'Open the app over its secure (https) address to use location.',
+};
 
 const SYNC_BADGE: Record<LocalSyncStatus, { label: string; cls: string }> = {
   pending_sync: { label: '📱 Pending sync', cls: 'bg-amber-100 text-amber-700' },
@@ -87,6 +106,12 @@ export function TimeClock() {
   const [note, setNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selfieFor, setSelfieFor] = useState<PunchType | null>(null);
+  // Required GPS: the fix is acquired in parallel with the selfie; a punch is
+  // blocked (with guidance) when no fix can be obtained.
+  const [locationBlocked, setLocationBlocked] = useState<LocationFailure | null>(null);
+  const locationReq = useRef<Promise<RequiredLocation> | null>(null);
+  const pendingPunch = useRef<{ type: PunchType; selfieB64: string | null } | null>(null);
+  const geoPerm = useRef<PermissionState | null>(null);
   // Roving employees (no home branch) pick which branch they're at.
   const [branchOptions, setBranchOptions] = useState<{ id: string; name: string }[]>([]);
   const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
@@ -152,6 +177,33 @@ export function TimeClock() {
     const t = setInterval(() => void refresh(), 30_000);
     return () => clearInterval(t);
   }, [pending, refresh]);
+
+  // Surface the browser's location permission prompt when the clock opens (not
+  // mid-punch), and track the permission state. One-shot request; GPS releases
+  // itself after the fix.
+  useEffect(() => {
+    if (!profile || !navigator.geolocation) return;
+    const prime = () =>
+      navigator.geolocation.getCurrentPosition(() => {}, () => {}, {
+        enableHighAccuracy: false,
+        timeout: 20_000,
+        maximumAge: 5 * 60_000,
+      });
+    if (navigator.permissions?.query) {
+      navigator.permissions
+        .query({ name: 'geolocation' })
+        .then((s) => {
+          geoPerm.current = s.state;
+          s.onchange = () => {
+            geoPerm.current = s.state;
+          };
+          if (s.state === 'prompt') prime();
+        })
+        .catch(prime);
+    } else {
+      prime();
+    }
+  }, [profile]);
 
   // Roving: restore the remembered branch choice (renders even offline).
   useEffect(() => {
@@ -234,7 +286,24 @@ export function TimeClock() {
       setError(null);
       setNote(null);
       try {
-        const { gps } = await recordPunch({ profile, branchId, type, selfieB64 });
+        // Time in/out require a GPS fix — the read started when the button was
+        // tapped and usually resolved while the selfie was taken.
+        let requiredGps: { gps?: GpsFix } = {};
+        if (SELFIE_PUNCH_TYPES.includes(type)) {
+          const req = locationReq.current ?? getRequiredLocation();
+          locationReq.current = null;
+          setNote('📍 Getting your location…');
+          const res = await req;
+          setNote(null);
+          if (!res.ok) {
+            pendingPunch.current = { type, selfieB64 };
+            setLocationBlocked(res.error);
+            setBusy(false);
+            return;
+          }
+          requiredGps = { gps: res.fix };
+        }
+        const { gps } = await recordPunch({ profile, branchId, type, selfieB64, ...requiredGps });
         if (!navigator.onLine) {
           setNote(
             `${PUNCH_LABELS[type]} saved on this device — it will sync automatically when you're back online.`,
@@ -262,10 +331,38 @@ export function TimeClock() {
 
   const onAction = (type: PunchType) => {
     if (busy) return;
-    // Clock in/out require a selfie: open the camera, which calls back with a
-    // selfie. Breaks stay one-tap.
-    if (SELFIE_PUNCH_TYPES.includes(type)) setSelfieFor(type);
-    else void doPunch(type, null);
+    // Clock in/out require a selfie AND a GPS fix. The location read starts
+    // now so it resolves while the selfie is taken; if the browser already
+    // reports location as blocked, skip the camera and show the guidance.
+    if (SELFIE_PUNCH_TYPES.includes(type)) {
+      if (geoPerm.current === 'denied') {
+        pendingPunch.current = { type, selfieB64: null };
+        setLocationBlocked('denied');
+        return;
+      }
+      locationReq.current = getRequiredLocation();
+      setSelfieFor(type);
+    } else {
+      void doPunch(type, null);
+    }
+  };
+
+  // Try again on the location-blocked card: re-read location; a selfie taken
+  // before the block is kept, otherwise the camera opens after.
+  const retryLocation = () => {
+    const pending = pendingPunch.current;
+    pendingPunch.current = null;
+    setLocationBlocked(null);
+    if (!pending) return;
+    locationReq.current = getRequiredLocation();
+    if (pending.selfieB64) void doPunch(pending.type, pending.selfieB64);
+    else setSelfieFor(pending.type);
+  };
+
+  const cancelLocation = () => {
+    pendingPunch.current = null;
+    locationReq.current = null;
+    setLocationBlocked(null);
   };
 
   const timeLabel = useMemo(() => clockFmt.format(now), [now]);
@@ -387,8 +484,26 @@ export function TimeClock() {
             setSelfieFor(null);
             void doPunch(t, b64);
           }}
-          onCancel={() => setSelfieFor(null)}
+          onCancel={() => {
+            locationReq.current = null;
+            setSelfieFor(null);
+          }}
         />
+      )}
+
+      {locationBlocked && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-6">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 text-center">
+            <p className="text-sm font-semibold text-ink">Your location is required to time in</p>
+            <p className="mt-2 text-sm text-muted">{LOCATION_HELP[locationBlocked]}</p>
+            <button onClick={retryLocation} className="btn-primary mt-4 w-full">
+              Try again
+            </button>
+            <button onClick={cancelLocation} className="btn mt-2 w-full">
+              Cancel
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

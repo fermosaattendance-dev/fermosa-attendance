@@ -59,6 +59,35 @@ export async function tryGetLocation(): Promise<GpsFix | null> {
   });
 }
 
+export type LocationFailure = 'denied' | 'unavailable' | 'timeout' | 'insecure';
+export type RequiredLocation =
+  | { ok: true; fix: GpsFix }
+  | { ok: false; error: LocationFailure };
+
+/**
+ * Required GPS for time in/out: unlike tryGetLocation there is no artificial
+ * race — the browser's permission prompt can take as long as it needs (the
+ * API's own timeout only counts once permission is resolved). Still a one-shot
+ * read: the GPS engages for this fix only and releases by itself.
+ */
+export async function getRequiredLocation(): Promise<RequiredLocation> {
+  if (typeof navigator === 'undefined' || !navigator.geolocation || !window.isSecureContext) {
+    return { ok: false, error: 'insecure' };
+  }
+  return new Promise<RequiredLocation>((resolve) => {
+    navigator.geolocation.getCurrentPosition(
+      (pos) =>
+        resolve({
+          ok: true,
+          fix: { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy ?? null },
+        }),
+      (err) =>
+        resolve({ ok: false, error: err.code === 1 ? 'denied' : err.code === 3 ? 'timeout' : 'unavailable' }),
+      { enableHighAccuracy: true, timeout: 25_000, maximumAge: 60_000 },
+    );
+  });
+}
+
 function base64ToBlob(b64: string, type = 'image/jpeg'): Blob {
   const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
   return new Blob([bytes], { type });
@@ -75,9 +104,11 @@ export async function recordPunch(args: {
   branchId: string | null;
   type: PunchType;
   selfieB64: string | null;
+  /** Pre-acquired fix (required-GPS flow). When omitted, best-effort lookup. */
+  gps?: GpsFix | null;
 }): Promise<{ gps: GpsFix | null }> {
   const clientUuid = uuid();
-  const gps = await tryGetLocation();
+  const gps = args.gps !== undefined ? args.gps : await tryGetLocation();
   await insertPunch({
     client_uuid: clientUuid,
     employee_id: args.profile.id,

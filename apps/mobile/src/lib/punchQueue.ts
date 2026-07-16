@@ -21,6 +21,45 @@ export interface GpsFix {
   accuracy: number | null;
 }
 
+export type LocationFailure = 'denied' | 'unavailable';
+export type RequiredLocation =
+  | { ok: true; fix: GpsFix }
+  | { ok: false; error: LocationFailure };
+
+/**
+ * Required GPS for time in/out: permission must be granted and a fix obtained,
+ * otherwise the punch is blocked with guidance. Longer window than the
+ * best-effort path, plus a fresh last-known fallback. One-shot read — GPS
+ * releases itself after the fix.
+ */
+export async function getRequiredLocation(): Promise<RequiredLocation> {
+  try {
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== 'granted') return { ok: false, error: 'denied' };
+
+    const fix = await Promise.race([
+      Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 20_000)),
+    ]);
+    if (fix) {
+      return {
+        ok: true,
+        fix: { lat: fix.coords.latitude, lng: fix.coords.longitude, accuracy: fix.coords.accuracy },
+      };
+    }
+    const last = await Location.getLastKnownPositionAsync({ maxAge: 2 * 60 * 1000 });
+    if (last) {
+      return {
+        ok: true,
+        fix: { lat: last.coords.latitude, lng: last.coords.longitude, accuracy: last.coords.accuracy },
+      };
+    }
+    return { ok: false, error: 'unavailable' };
+  } catch {
+    return { ok: false, error: 'unavailable' };
+  }
+}
+
 /** Best-effort GPS: a punch must NEVER fail or hang because of location. */
 export async function tryGetLocation(): Promise<GpsFix | null> {
   try {
@@ -54,12 +93,14 @@ export async function recordPunch(
   type: PunchType,
   branchId: string | null,
   selfieB64: string | null = null,
+  /** Pre-acquired fix (required-GPS flow). When omitted, best-effort lookup. */
+  gpsArg?: GpsFix | null,
 ): Promise<{
   clientUuid: string;
   gps: GpsFix | null;
 }> {
   const clientUuid = Crypto.randomUUID();
-  const gps = await tryGetLocation();
+  const gps = gpsArg !== undefined ? gpsArg : await tryGetLocation();
 
   insertPunch({
     client_uuid: clientUuid,
