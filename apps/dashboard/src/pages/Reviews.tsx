@@ -9,6 +9,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { SelfieThumb } from '../components/SelfieThumb';
 import { useAuth } from '../lib/auth';
+import { getSelfieUrls } from '../lib/selfieUrls';
 import { supabase } from '../lib/supabase';
 
 interface RecordRow {
@@ -125,12 +126,7 @@ function DayDetail({ record }: { record: RecordRow }) {
         setEvents(rows);
         const paths = rows.filter((r) => r.selfie_path).map((r) => r.selfie_path!);
         if (paths.length > 0) {
-          const { data: signed } = await supabase.storage.from('selfies').createSignedUrls(paths, 600);
-          const map: Record<string, string> = {};
-          signed?.forEach((s) => {
-            if (s.signedUrl && s.path) map[s.path] = s.signedUrl;
-          });
-          setSelfies(map);
+          setSelfies(await getSelfieUrls(paths));
         }
       });
   }, [record]);

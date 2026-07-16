@@ -10,6 +10,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { PageHeader } from '../components/PageHeader';
 import { SelfieThumb } from '../components/SelfieThumb';
 import { useAuth } from '../lib/auth';
+import { getSelfieUrls } from '../lib/selfieUrls';
 import { supabase } from '../lib/supabase';
 
 interface EventRow {
@@ -150,15 +151,12 @@ export function Punches() {
         setRows(list);
         setLoading(false);
 
-        // Selfie thumbnails (signed URLs).
+        // Selfie thumbnails — cached signed URLs, so auto-refresh doesn't
+        // re-download every photo (see lib/selfieUrls.ts).
         const paths = list.filter((r) => r.selfie_path).map((r) => r.selfie_path!);
         if (paths.length > 0) {
-          const { data: signed } = await supabase.storage.from('selfies').createSignedUrls(paths, 600);
+          const smap = await getSelfieUrls(paths);
           if (seq !== loadSeq.current) return;
-          const smap: Record<string, string> = {};
-          signed?.forEach((s) => {
-            if (s.signedUrl && s.path) smap[s.path] = s.signedUrl;
-          });
           setSelfies(smap);
         }
 
