@@ -313,11 +313,203 @@ function CorrectionForm({
   );
 }
 
+/**
+ * HR manual time entry — record a day the employee never punched (dead phone,
+ * emergency, forgot). Creates the day record (create_attendance_record RPC),
+ * then saves the entered times as an audited correction via review_attendance.
+ * Punches are never fabricated: the entry lives on the day record with the
+ * reviewer's name and a required reason.
+ */
+function ManualEntryForm({
+  employees,
+  branches,
+  settings,
+  onDone,
+  onCancel,
+}: {
+  employees: FilterOption[];
+  branches: FilterOption[];
+  settings: EngineSettings;
+  onDone: () => void;
+  onCancel: () => void;
+}) {
+  const [employeeId, setEmployeeId] = useState('');
+  const [date, setDate] = useState(() => manilaDateFmt.format(new Date()));
+  const [branchId, setBranchId] = useState('');
+  const [inTime, setInTime] = useState('');
+  const [outTime, setOutTime] = useState('');
+  const [reason, setReason] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const employee = employees.find((e) => e.id === employeeId) ?? null;
+  const isRoving = !!employee && !employee.branch_id;
+  const effectiveBranchId = employee?.branch_id ?? (branchId || null);
+  const branch = branches.find((b) => b.id === effectiveBranchId) ?? null;
+
+  // 'HH:MM' on the date (Manila) → ISO; out rolls +24h when ≤ in (overnight).
+  const inIso = inTime && date ? new Date(`${date}T${inTime}:00+08:00`).toISOString() : null;
+  let outIso = outTime && date ? new Date(`${date}T${outTime}:00+08:00`).toISOString() : null;
+  if (inIso && outIso && Date.parse(outIso) <= Date.parse(inIso)) {
+    outIso = new Date(Date.parse(outIso) + 24 * 3_600_000).toISOString();
+  }
+
+  let minutes = null;
+  if (inIso && outIso) {
+    minutes = computeDayMinutes({
+      workDate: date,
+      shiftStart: branch?.shift_start ?? '00:00',
+      shiftEnd: branch?.shift_end ?? '00:00',
+      firstInIso: inIso,
+      lastOutIso: outIso,
+      punchedBreakMin: 0,
+      lateGraceMin: settings.late_grace_min,
+      otThresholdMin: settings.ot_threshold_min,
+      minBreakMin: settings.min_break_min,
+    });
+    if (minutes && !branch) {
+      // No branch shift to compare against — only span-based numbers apply.
+      minutes = { ...minutes, late_minutes: 0, undertime_minutes: 0, overtime_minutes: 0 };
+    }
+  }
+
+  const submit = async () => {
+    if (!employeeId || !date || !minutes || !inIso || !outIso) return;
+    if (!effectiveBranchId) {
+      setError('Pick the branch this employee worked at.');
+      return;
+    }
+    setError(null);
+    setBusy(true);
+    const { data: recordId, error: createErr } = await supabase.rpc('create_attendance_record', {
+      p_employee_id: employeeId,
+      p_work_date: date,
+      p_branch_id: effectiveBranchId,
+    });
+    if (createErr || !recordId) {
+      setBusy(false);
+      setError(createErr?.message ?? 'Could not create the attendance day.');
+      return;
+    }
+    const { error: revErr } = await supabase.rpc('review_attendance', {
+      p_record_id: recordId,
+      p_status: 'corrected',
+      p_note: reason,
+      p_corrections: { first_in: inIso, last_out: outIso, ...minutes },
+    });
+    setBusy(false);
+    if (revErr) {
+      setError(revErr.message);
+      return;
+    }
+    onDone();
+  };
+
+  return (
+    <div className="mt-4 card p-4">
+      <h3 className="text-sm font-semibold text-ink">Manual time entry</h3>
+      <p className="mt-1 text-xs text-gray-500">
+        For a day the employee couldn't punch (emergency, dead phone). Saved as a corrected day
+        with your name and the reason — payroll and the timesheet pick it up automatically.
+      </p>
+      <div className="mt-3 flex flex-wrap items-end gap-3">
+        <label className="text-xs text-gray-600">
+          Employee
+          <select
+            value={employeeId}
+            onChange={(e) => setEmployeeId(e.target.value)}
+            className="mt-1 block input"
+          >
+            <option value="">Select…</option>
+            {employees.map((e) => (
+              <option key={e.id} value={e.id}>
+                {e.full_name} ({e.employee_code})
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="text-xs text-gray-600">
+          Date
+          <input
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            className="mt-1 block input"
+          />
+        </label>
+        {isRoving && (
+          <label className="text-xs text-gray-600">
+            Branch (roving)
+            <select
+              value={branchId}
+              onChange={(e) => setBranchId(e.target.value)}
+              className="mt-1 block input"
+            >
+              <option value="">Select…</option>
+              {branches.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        <label className="text-xs text-gray-600">
+          Time in
+          <input
+            type="time"
+            value={inTime}
+            onChange={(e) => setInTime(e.target.value)}
+            className="mt-1 block input"
+          />
+        </label>
+        <label className="text-xs text-gray-600">
+          Time out
+          <input
+            type="time"
+            value={outTime}
+            onChange={(e) => setOutTime(e.target.value)}
+            className="mt-1 block input"
+          />
+        </label>
+        <label className="min-w-64 flex-1 text-xs text-gray-600">
+          Reason (required)
+          <input
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="e.g. phone died — times confirmed with branch manager"
+            className="mt-1 block w-full input"
+          />
+        </label>
+        <button
+          onClick={() => void submit()}
+          disabled={busy || !employeeId || !reason.trim() || !minutes || (isRoving && !branchId)}
+          className="btn-primary disabled:opacity-50"
+        >
+          {busy ? 'Saving…' : 'Save entry'}
+        </button>
+        <button onClick={onCancel} className="btn">
+          Cancel
+        </button>
+      </div>
+      <p className="mt-2 text-xs text-gray-500">
+        {minutes
+          ? `→ worked ${fmtMinutes(minutes.worked_minutes)} · late ${minutes.late_minutes}m · undertime ${minutes.undertime_minutes}m · OT ${minutes.overtime_minutes}m (break ${minutes.break_minutes}m deducted)`
+          : 'Enter the time in and time out (out must be after in).'}
+      </p>
+      {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
+    </div>
+  );
+}
+
 interface FilterOption {
   id: string;
   full_name?: string;
   employee_code?: string;
   name?: string;
+  branch_id?: string | null; // employees: home branch (null = roving)
+  shift_start?: string; // branches: for manual-entry math
+  shift_end?: string;
 }
 
 export function Reviews() {
@@ -326,6 +518,7 @@ export function Reviews() {
   const [statusFilter, setStatusFilter] = useState<string>('pending_review');
   const [openId, setOpenId] = useState<string | null>(null);
   const [correctId, setCorrectId] = useState<string | null>(null);
+  const [manualOpen, setManualOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Extra filters (RLS already scopes visibility; these narrow within it).
@@ -348,12 +541,12 @@ export function Reviews() {
   useEffect(() => {
     supabase
       .from('profiles')
-      .select('id, full_name, employee_code')
+      .select('id, full_name, employee_code, branch_id')
       .order('full_name')
       .then(({ data }) => setEmployees((data as FilterOption[]) ?? []));
     supabase
       .from('branches')
-      .select('id, name')
+      .select('id, name, shift_start, shift_end')
       .eq('is_active', true)
       .order('name')
       .then(({ data }) => setBranches((data as FilterOption[]) ?? []));
@@ -425,6 +618,24 @@ export function Reviews() {
             : 'View-only: approvals are handled by HR, operations, or super admin.'}
         </p>
       </div>
+
+      {canReview &&
+        (manualOpen ? (
+          <ManualEntryForm
+            employees={employees}
+            branches={branches}
+            settings={engineSettings}
+            onDone={() => {
+              setManualOpen(false);
+              load();
+            }}
+            onCancel={() => setManualOpen(false)}
+          />
+        ) : (
+          <button onClick={() => setManualOpen(true)} className="mt-4 btn-primary">
+            Manual time entry
+          </button>
+        ))}
 
       <div className="mt-4 flex flex-wrap items-end gap-3 card p-4">
         <label className="text-sm">
