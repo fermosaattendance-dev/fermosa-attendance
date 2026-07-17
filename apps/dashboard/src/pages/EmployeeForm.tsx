@@ -1,4 +1,5 @@
 import {
+  COMPANY_WIDE_ROLES,
   ROLE_LABELS,
   type EmploymentStatus,
   type Profile,
@@ -51,6 +52,12 @@ export function EmployeeForm() {
   const [newPassword, setNewPassword] = useState('');
   const [loginName, setLoginName] = useState<string | null>(null);
 
+  // Compensation — HR/admins only; the table's RLS blocks everyone else anyway.
+  const isAdmin = me ? COMPANY_WIDE_ROLES.includes(me.role) : false;
+  const [monthlyRate, setMonthlyRate] = useState('');
+  const [dailyAllowance, setDailyAllowance] = useState('');
+  const [compExists, setCompExists] = useState(false);
+
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -86,6 +93,35 @@ export function EmployeeForm() {
       if (typeof data === 'string') setLoginName(data);
     });
   }, [id]);
+
+  useEffect(() => {
+    if (!id || !isAdmin) return;
+    supabase
+      .from('employee_compensation')
+      .select('monthly_rate, daily_allowance')
+      .eq('employee_id', id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data) {
+          setMonthlyRate(String(data.monthly_rate));
+          setDailyAllowance(String(data.daily_allowance));
+          setCompExists(true);
+        }
+      });
+  }, [id, isAdmin]);
+
+  /** Upsert the pay row; returns an error message or null. Skips when nothing was entered. */
+  const saveCompensation = async (employeeId: string): Promise<string | null> => {
+    if (!isAdmin) return null;
+    if (!compExists && monthlyRate === '' && dailyAllowance === '') return null;
+    const { error: compErr } = await supabase.from('employee_compensation').upsert({
+      employee_id: employeeId,
+      monthly_rate: Number(monthlyRate) || 0,
+      daily_allowance: Number(dailyAllowance) || 0,
+    });
+    if (!compErr) setCompExists(true);
+    return compErr ? compErr.message : null;
+  };
 
   const roleOptions = (Object.keys(ROLE_LABELS) as Role[]).filter(
     (r) => r !== 'super_admin' || me?.role === 'super_admin',
@@ -135,11 +171,20 @@ export function EmployeeForm() {
         employment_status: status,
         phone: phone || null,
       });
-      setBusy(false);
       if (!res.ok) {
+        setBusy(false);
         setError(res.error ?? 'Failed to create employee');
         return;
       }
+      if (res.user_id) {
+        const compErr = await saveCompensation(res.user_id);
+        if (compErr) {
+          setBusy(false);
+          setError(`Employee created, but pay was not saved (${compErr}) — open their page to set it.`);
+          return;
+        }
+      }
+      setBusy(false);
       navigate('/employees');
     } else {
       const { error: updErr } = await supabase
@@ -155,9 +200,15 @@ export function EmployeeForm() {
           phone: phone || null,
         })
         .eq('id', id);
-      setBusy(false);
       if (updErr) {
+        setBusy(false);
         setError(updErr.message);
+        return;
+      }
+      const compErr = await saveCompensation(id!);
+      setBusy(false);
+      if (compErr) {
+        setError(`Saved, but pay was not updated: ${compErr}`);
         return;
       }
       setNotice('Employee updated.');
@@ -327,6 +378,44 @@ export function EmployeeForm() {
             <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+63 9xx xxx xxxx" className={inputClass} />
           </div>
         </div>
+
+        {isAdmin && (
+          <div className="border-t border-gray-100 pt-4">
+            <h3 className="text-sm font-semibold text-gray-900">Compensation</h3>
+            <p className="mt-1 text-xs text-gray-500">
+              Visible to HR and admins only. The allowance is paid per <strong>full</strong> day
+              present — a half-day (late past the half-day mark) earns no allowance.
+            </p>
+            <div className="mt-3 grid grid-cols-2 gap-4">
+              <div>
+                <label className={labelClass}>Monthly salary rate (₱)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  inputMode="decimal"
+                  value={monthlyRate}
+                  onChange={(e) => setMonthlyRate(e.target.value)}
+                  placeholder="0.00"
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <label className={labelClass}>Allowance per full day (₱)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  inputMode="decimal"
+                  value={dailyAllowance}
+                  onChange={(e) => setDailyAllowance(e.target.value)}
+                  placeholder="0.00"
+                  className={inputClass}
+                />
+              </div>
+            </div>
+          </div>
+        )}
 
         {error && <p className="text-sm text-red-600">{error}</p>}
         {notice && <p className="text-sm text-green-700">{notice}</p>}

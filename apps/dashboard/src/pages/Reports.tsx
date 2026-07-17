@@ -224,13 +224,16 @@ export function Reports() {
     switch (reportType) {
       case 'payroll': {
         const headers = [
-          'Code', 'Name', 'Branch', 'Present', 'Absent', 'Worked (h)', 'Late (min)',
+          'Code', 'Name', 'Branch', 'Present', 'Full days', 'Absent', 'Worked (h)', 'Late (min)',
           'Undertime (min)', 'OT (min)', 'Paid leave', 'Unpaid leave', 'Rest-days worked', 'Holidays worked',
+          // Rates are admin-only (RLS nulls them for branch managers — hide the empty columns).
+          ...(isCompanyWide ? ['Monthly rate (₱)', 'Allowance/full day (₱)'] : []),
         ];
         const rows: Cell[][] = payrollRows.map((r) => [
-          r.employee_code, r.full_name, r.branch_name, r.days_present, r.days_absent,
+          r.employee_code, r.full_name, r.branch_name, r.days_present, r.full_days, r.days_absent,
           hours(r.worked_minutes), r.late_minutes, r.undertime_minutes, r.overtime_minutes,
           fmtDays(r.paid_leave_days), fmtDays(r.unpaid_leave_days), r.rest_days_worked, r.holidays_worked,
+          ...(isCompanyWide ? [r.monthly_rate ?? '', r.daily_allowance ?? ''] : []),
         ]);
         return { headers, rows, sheetName: 'Payroll', filename: `payroll_${periodTag}` };
       }
@@ -309,7 +312,7 @@ export function Reports() {
         return { headers, rows, sheetName: 'Leave', filename: `leave_${periodTag}` };
       }
     }
-  }, [reportType, payrollRows, effRows, leaveRows, year, month, half, dayDate, branchId, employeeId, empMap, branchMap]);
+  }, [reportType, payrollRows, effRows, leaveRows, year, month, half, dayDate, branchId, employeeId, empMap, branchMap, isCompanyWide]);
 
   if (!profile) return null;
 
