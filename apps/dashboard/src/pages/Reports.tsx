@@ -225,15 +225,15 @@ export function Reports() {
       case 'payroll': {
         const headers = [
           'Code', 'Name', 'Branch', 'Present', 'Full days', 'Absent', 'Worked (h)', 'Late (min)',
-          'Undertime (min)', 'OT (min)', 'Paid leave', 'Unpaid leave', 'Rest-days worked', 'Holidays worked',
-          // Rates are admin-only (RLS nulls them for branch managers — hide the empty columns).
-          ...(isCompanyWide ? ['Daily rate (₱)', 'Allowance/full day (₱)', 'Late charge (₱)'] : []),
+          'Undertime (min)', 'OT (min)', 'OT hrs (paid)', 'Paid leave', 'Unpaid leave', 'Rest-days worked', 'Holidays worked',
+          // Rates + peso amounts are admin-only (RLS nulls them for branch managers — hide the empty columns).
+          ...(isCompanyWide ? ['Daily rate (₱)', 'Allowance/full day (₱)', 'Late charge (₱)', 'OT pay (₱)'] : []),
         ];
         const rows: Cell[][] = payrollRows.map((r) => [
           r.employee_code, r.full_name, r.branch_name, r.days_present, r.full_days, r.days_absent,
-          hours(r.worked_minutes), r.late_minutes, r.undertime_minutes, r.overtime_minutes,
+          hours(r.worked_minutes), r.late_minutes, r.undertime_minutes, r.overtime_minutes, r.ot_paid_hours,
           fmtDays(r.paid_leave_days), fmtDays(r.unpaid_leave_days), r.rest_days_worked, r.holidays_worked,
-          ...(isCompanyWide ? [r.daily_rate ?? '', r.daily_allowance ?? '', r.late_charge ?? ''] : []),
+          ...(isCompanyWide ? [r.daily_rate ?? '', r.daily_allowance ?? '', r.late_charge ?? '', r.ot_pay ?? ''] : []),
         ]);
         return { headers, rows, sheetName: 'Payroll', filename: `payroll_${periodTag}` };
       }

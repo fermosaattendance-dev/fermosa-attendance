@@ -106,6 +106,8 @@ export interface PayrollSummaryRow {
   daily_rate: number | null; // null: no compensation set, or the caller may not see it
   daily_allowance: number | null;
   late_charge: number | null; // (late + undertime minutes) × daily_rate/480, all days
+  ot_paid_hours: number; // whole OT hours, floored per day (not rate-derived)
+  ot_pay: number | null; // ot_paid_hours × daily_rate × 1.25/8; null when rate hidden
 }
 
 /** Status of a payroll → Google Sheets push. */
