@@ -495,99 +495,192 @@ function BalancesTab({
   onError: (m: string) => void;
 }) {
   const [draft, setDraft] = useState<Record<string, string>>({});
+  const [search, setSearch] = useState('');
+  const [mode, setMode] = useState<'all' | 'used' | 'left' | 'noleft'>('all');
 
-  const typeName = (id: string) => types.find((t) => t.id === id)?.name ?? '—';
-  const empName = (id: string) => employees.find((e) => e.id === id)?.full_name ?? '—';
+  // One column per leave type that has balance rows, ordered: main paid pool →
+  // birthday → unpaid — so the table stays one row per employee.
+  const cols = useMemo(() => {
+    const withRows = new Set(balances.map((b) => b.leave_type_id));
+    const rank = (t: TypeLite) => (!t.is_paid ? 2 : t.birthday_only ? 1 : 0);
+    return types
+      .filter((t) => withRows.has(t.id))
+      .sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name));
+  }, [balances, types]);
 
-  const rows = useMemo(
-    () =>
-      [...balances].sort((a, b) => {
-        const n = empName(a.employee_id).localeCompare(empName(b.employee_id));
-        return n !== 0 ? n : typeName(a.leave_type_id).localeCompare(typeName(b.leave_type_id));
-      }),
-    [balances, employees, types],
-  );
+  interface EmpRow {
+    employeeId: string;
+    name: string;
+    code: string;
+    byType: Record<string, BalanceRow>;
+    totalUsed: number;
+    paidRemaining: number;
+  }
 
-  const save = async (row: BalanceRow) => {
-    const raw = draft[row.id];
-    if (raw === undefined) return;
-    const value = Number(raw);
-    if (Number.isNaN(value) || value < 0) {
-      onError('Entitlement must be a non-negative number.');
-      return;
+  const rows: EmpRow[] = useMemo(() => {
+    const paidIds = new Set(types.filter((t) => t.is_paid).map((t) => t.id));
+    const byEmp = new Map<string, EmpRow>();
+    for (const b of balances) {
+      let r = byEmp.get(b.employee_id);
+      if (!r) {
+        const emp = employees.find((e) => e.id === b.employee_id);
+        r = {
+          employeeId: b.employee_id,
+          name: emp?.full_name ?? '—',
+          code: emp?.employee_code ?? '',
+          byType: {},
+          totalUsed: 0,
+          paidRemaining: 0,
+        };
+        byEmp.set(b.employee_id, r);
+      }
+      r.byType[b.leave_type_id] = b;
+      r.totalUsed += b.used_days;
+      if (paidIds.has(b.leave_type_id)) r.paidRemaining += b.remaining_days;
     }
-    const { error: err } = await supabase
-      .from('leave_balances')
-      .update({ entitled_days: value })
-      .eq('id', row.id);
-    if (err) onError(err.message);
-    else {
-      setDraft((d) => {
-        const next = { ...d };
-        delete next[row.id];
-        return next;
-      });
-      onSaved();
+    return [...byEmp.values()].sort((a, b) => a.name.localeCompare(b.name));
+  }, [balances, employees, types]);
+
+  const q = search.trim().toLowerCase();
+  const visible = rows.filter((r) => {
+    if (q && !r.name.toLowerCase().includes(q) && !r.code.toLowerCase().includes(q)) return false;
+    if (mode === 'used') return r.totalUsed > 0;
+    if (mode === 'left') return r.paidRemaining > 0;
+    if (mode === 'noleft') return r.paidRemaining <= 0;
+    return true;
+  });
+
+  /** Save every edited entitlement on this employee's row. */
+  const saveRow = async (r: EmpRow) => {
+    const dirtyIds = Object.values(r.byType)
+      .map((b) => b.id)
+      .filter((id) => draft[id] !== undefined);
+    for (const id of dirtyIds) {
+      const value = Number(draft[id]);
+      if (Number.isNaN(value) || value < 0) {
+        onError('Entitlement must be a non-negative number.');
+        return;
+      }
     }
+    for (const id of dirtyIds) {
+      const { error: err } = await supabase
+        .from('leave_balances')
+        .update({ entitled_days: Number(draft[id]) })
+        .eq('id', id);
+      if (err) {
+        onError(err.message);
+        return;
+      }
+    }
+    setDraft((d) => {
+      const next = { ...d };
+      for (const id of dirtyIds) delete next[id];
+      return next;
+    });
+    onSaved();
   };
 
   return (
     <div className="mt-4 overflow-hidden card">
       <div className="border-b border-gray-100 px-4 py-2 text-xs text-gray-500">
-        {YEAR} entitlements. Used and remaining are computed from approved requests. Edit an entitlement and press
-        Save. Use “Grant entitlements” on the Settings page to create rows for everyone.
+        {YEAR} entitlements — one row per employee. Used and remaining are computed from approved
+        requests. Edit an entitlement and press Save. Use “Grant entitlements” on the Settings page
+        to create rows for everyone.
       </div>
-      <table className="w-full text-left text-sm">
-        <thead className="bg-ground text-muted">
-          <tr>
-            <th className="px-4 py-2 font-medium">Employee</th>
-            <th className="px-4 py-2 font-medium">Type</th>
-            <th className="px-4 py-2 font-medium">Entitled</th>
-            <th className="px-4 py-2 font-medium">Used</th>
-            <th className="px-4 py-2 font-medium">Remaining</th>
-            <th className="px-4 py-2" />
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-100">
-          {rows.length === 0 && (
+      <div className="flex flex-wrap items-center gap-2 border-b border-gray-100 px-4 py-3">
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search name or code…"
+          className="input w-56"
+        />
+        <select
+          value={mode}
+          onChange={(e) => setMode(e.target.value as typeof mode)}
+          className="input w-auto"
+        >
+          <option value="all">All employees</option>
+          <option value="used">Has used leave</option>
+          <option value="left">Has remaining leave</option>
+          <option value="noleft">No remaining leave</option>
+        </select>
+        <span className="ml-auto text-xs text-gray-500">
+          {visible.length} of {rows.length} employee{rows.length === 1 ? '' : 's'}
+        </span>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-left text-sm">
+          <thead className="bg-ground text-muted">
             <tr>
-              <td colSpan={6} className="px-4 py-6 text-center text-gray-400">
-                No balances yet. Grant entitlements from the Settings page.
-              </td>
+              <th className="px-4 py-2 font-medium">Employee</th>
+              {cols.map((t) => (
+                <th key={t.id} className="px-4 py-2 font-medium">
+                  {t.name}
+                  {t.is_paid ? '' : ' (unpaid)'}
+                </th>
+              ))}
+              <th className="px-4 py-2" />
             </tr>
-          )}
-          {rows.map((b) => {
-            const dirty = draft[b.id] !== undefined;
-            return (
-              <tr key={b.id} className="hover:bg-gray-50">
-                <td className="px-4 py-2 font-medium text-gray-900">{empName(b.employee_id)}</td>
-                <td className="px-4 py-2 text-gray-700">{typeName(b.leave_type_id)}</td>
-                <td className="px-4 py-2">
-                  <input
-                    value={draft[b.id] ?? fmtDays(b.entitled_days)}
-                    onChange={(e) => setDraft((d) => ({ ...d, [b.id]: e.target.value }))}
-                    className="w-20 input"
-                  />
-                </td>
-                <td className="px-4 py-2 text-gray-700">{fmtDays(b.used_days)}</td>
-                <td className={`px-4 py-2 font-medium ${b.remaining_days < 0 ? 'text-red-600' : 'text-gray-900'}`}>
-                  {fmtDays(b.remaining_days)}
-                </td>
-                <td className="px-4 py-2 text-right">
-                  {dirty && (
-                    <button
-                      onClick={() => save(b)}
-                      className="btn-primary px-2.5 py-1 text-xs"
-                    >
-                      Save
-                    </button>
-                  )}
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {visible.length === 0 && (
+              <tr>
+                <td colSpan={cols.length + 2} className="px-4 py-6 text-center text-gray-400">
+                  {rows.length === 0
+                    ? 'No balances yet. Grant entitlements from the Settings page.'
+                    : 'No employees match the filter.'}
                 </td>
               </tr>
-            );
-          })}
-        </tbody>
-      </table>
+            )}
+            {visible.map((r) => {
+              const dirty = Object.values(r.byType).some((b) => draft[b.id] !== undefined);
+              return (
+                <tr key={r.employeeId} className="hover:bg-gray-50 align-top">
+                  <td className="px-4 py-2">
+                    <div className="font-medium text-gray-900">{r.name}</div>
+                    {r.code && <div className="text-xs text-gray-400">{r.code}</div>}
+                  </td>
+                  {cols.map((t) => {
+                    const b = r.byType[t.id];
+                    return (
+                      <td key={t.id} className="px-4 py-2">
+                        {b ? (
+                          <div>
+                            <input
+                              value={draft[b.id] ?? fmtDays(b.entitled_days)}
+                              onChange={(e) => setDraft((d) => ({ ...d, [b.id]: e.target.value }))}
+                              className="w-16 input"
+                            />
+                            <div className="mt-1 text-xs text-gray-500">
+                              used {fmtDays(b.used_days)} ·{' '}
+                              <span
+                                className={
+                                  b.remaining_days < 0 ? 'font-medium text-red-600' : 'font-medium text-gray-900'
+                                }
+                              >
+                                left {fmtDays(b.remaining_days)}
+                              </span>
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-gray-300">—</span>
+                        )}
+                      </td>
+                    );
+                  })}
+                  <td className="px-4 py-2 text-right">
+                    {dirty && (
+                      <button onClick={() => saveRow(r)} className="btn-primary px-2.5 py-1 text-xs">
+                        Save
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
