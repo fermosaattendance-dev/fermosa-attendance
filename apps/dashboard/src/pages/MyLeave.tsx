@@ -216,7 +216,18 @@ export function MyLeave() {
                 return (
                   <div key={bal.leave_type_id} className="card px-4 py-3 text-center">
                     <div className="text-xs text-muted">{name}</div>
-                    <div className="text-2xl font-bold text-ink">{fmtDays(bal.remaining_days)}</div>
+                    <div
+                      className={`text-2xl font-bold ${
+                        // Running-low warning: ≤ 2 left on a pool bigger than 2
+                        // (small pools like Birthday sit at 1 by design) or overdrawn.
+                        bal.remaining_days < 0 ||
+                        (bal.entitled_days > 2 && bal.remaining_days <= 2)
+                          ? 'text-red-600'
+                          : 'text-ink'
+                      }`}
+                    >
+                      {fmtDays(bal.remaining_days)}
+                    </div>
                     <div className="text-xs text-muted">of {fmtDays(bal.entitled_days)} left</div>
                   </div>
                 );

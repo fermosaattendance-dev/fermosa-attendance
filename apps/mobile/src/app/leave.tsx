@@ -246,7 +246,17 @@ export default function LeaveScreen() {
               return (
                 <View key={b.leave_type_id} style={styles.balanceCard}>
                   <Text style={styles.balanceName}>{name}</Text>
-                  <Text style={styles.balanceBig}>{fmtDays(b.remaining_days)}</Text>
+                  <Text
+                    style={[
+                      styles.balanceBig,
+                      // Running-low warning: ≤ 2 left on a pool bigger than 2, or overdrawn.
+                      (b.remaining_days < 0 || (b.entitled_days > 2 && b.remaining_days <= 2)) && {
+                        color: '#dc2626',
+                      },
+                    ]}
+                  >
+                    {fmtDays(b.remaining_days)}
+                  </Text>
                   <Text style={styles.muted}>of {fmtDays(b.entitled_days)} left</Text>
                 </View>
               );

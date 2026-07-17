@@ -655,7 +655,13 @@ function BalancesTab({
                               used {fmtDays(b.used_days)} ·{' '}
                               <span
                                 className={
-                                  b.remaining_days < 0 ? 'font-medium text-red-600' : 'font-medium text-gray-900'
+                                  // Warning red when the pool is running low (≤ 2 left on a
+                                  // pool bigger than 2 — small pools like Birthday/Unpaid sit
+                                  // at 1/0 by design) or overdrawn.
+                                  b.remaining_days < 0 ||
+                                  (b.entitled_days > 2 && b.remaining_days <= 2)
+                                    ? 'font-semibold text-red-600'
+                                    : 'font-medium text-gray-900'
                                 }
                               >
                                 left {fmtDays(b.remaining_days)}
