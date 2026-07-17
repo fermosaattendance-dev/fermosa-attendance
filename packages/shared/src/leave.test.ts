@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { countLeaveDays } from './leave';
+import { countLeaveDays, isLeaveEligible } from './leave';
 
 // Mon-Sat branch (matches Fermosa's default work_days {1,2,3,4,5,6}).
 const MON_SAT = [1, 2, 3, 4, 5, 6];
@@ -38,5 +38,18 @@ describe('countLeaveDays', () => {
   it('respects a Mon–Fri branch (Sat also off)', () => {
     // Fri 07-17, Sat 07-18 (off), Sun 07-19 (off), Mon 07-20 → 2
     expect(countLeaveDays('2026-07-17', '2026-07-20', [1, 2, 3, 4, 5])).toBe(2);
+  });
+});
+
+describe('isLeaveEligible', () => {
+  it('is true only for regular (active) employees', () => {
+    expect(isLeaveEligible('active')).toBe(true);
+  });
+
+  it('is false for probationary and other non-active statuses', () => {
+    expect(isLeaveEligible('probationary')).toBe(false);
+    expect(isLeaveEligible('on_leave')).toBe(false);
+    expect(isLeaveEligible('resigned')).toBe(false);
+    expect(isLeaveEligible('terminated')).toBe(false);
   });
 });

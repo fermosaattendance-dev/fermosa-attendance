@@ -6,6 +6,17 @@
  * (trigger-computed) stays authoritative.
  */
 
+import type { EmploymentStatus } from './types';
+
+/**
+ * Leave (entitlements + the "My leave" UI) is for REGULAR employees only —
+ * employment_status 'active'. Mirrors the grant_leave_entitlements SQL gate,
+ * so probationary and other non-active staff see no leave anywhere.
+ */
+export function isLeaveEligible(status: EmploymentStatus): boolean {
+  return status === 'active';
+}
+
 /** ISO date string 'YYYY-MM-DD' → ISO weekday 1 (Mon) … 7 (Sun). */
 function isoWeekday(date: string): number {
   // Parse as UTC noon to avoid any timezone/DST edge on the date boundary.

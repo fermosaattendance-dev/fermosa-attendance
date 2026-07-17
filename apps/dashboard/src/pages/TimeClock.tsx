@@ -3,6 +3,7 @@ import {
   PUNCH_LABELS,
   SELFIE_PUNCH_TYPES,
   checkGeofence,
+  isLeaveEligible,
   nextAllowedPunchTypes,
   workStatusFromLastPunch,
   type PunchType,
@@ -485,9 +486,11 @@ export function TimeClock() {
       )}
 
       <div className="mt-6 flex flex-wrap gap-2">
-        <Link to="/my/leave" className="btn">
-          Leave &amp; balances
-        </Link>
+        {isLeaveEligible(profile.employment_status) && (
+          <Link to="/my/leave" className="btn">
+            Leave &amp; balances
+          </Link>
+        )}
         <Link to="/my/password" className="btn">
           Change password
         </Link>
@@ -560,8 +563,10 @@ export function TimeClock() {
               Happy Birthday, {profile.full_name.split(' ')[0]}! 🎉
             </p>
             <p className="mt-2 text-sm text-muted">
-              Wishing you a wonderful year ahead from the whole Fermosa team. Enjoy your day — don't
-              forget your birthday leave this month 🎁
+              Wishing you a wonderful year ahead from the whole Fermosa team.
+              {isLeaveEligible(profile.employment_status)
+                ? ' Enjoy your day — don’t forget your birthday leave this month 🎁'
+                : ' Enjoy your day! 🎁'}
             </p>
             <button onClick={dismissBirthday} className="btn-primary mt-4 w-full">
               Thanks! 🎉

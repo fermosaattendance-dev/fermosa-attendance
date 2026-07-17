@@ -1,4 +1,4 @@
-import { LEAVE_STATUS_LABELS, countLeaveDays, type LeaveStatus } from '@fermosa/shared';
+import { LEAVE_STATUS_LABELS, countLeaveDays, isLeaveEligible, type LeaveStatus } from '@fermosa/shared';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { PageHeader } from '../components/PageHeader';
 import { useAuth } from '../lib/auth';
@@ -185,6 +185,19 @@ export function MyLeave() {
   };
 
   if (!profile) return null;
+
+  // Leave is a regular-employee perk — probationary/other staff have none.
+  if (!isLeaveEligible(profile.employment_status)) {
+    return (
+      <div className="mx-auto max-w-2xl">
+        <PageHeader title="My leave" crumb="My leave" />
+        <div className="card px-5 py-6 text-sm text-muted">
+          Leave becomes available once you’re a regular employee. Check with HR if you have
+          questions about your status.
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-2xl">

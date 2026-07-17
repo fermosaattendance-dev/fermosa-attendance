@@ -1,4 +1,4 @@
-import { COMPANY_WIDE_ROLES, ROLE_LABELS } from '@fermosa/shared';
+import { COMPANY_WIDE_ROLES, ROLE_LABELS, isLeaveEligible } from '@fermosa/shared';
 import {
   BarChart3,
   Building2,
@@ -62,7 +62,9 @@ export function Layout() {
   const isBranchManager = profile.role === 'branch_manager';
   const canSee = (a: Access) =>
     a === 'all' || (a === 'admin' && isAdmin) || (a === 'manager' && (isAdmin || isBranchManager));
-  const items = NAV.filter((i) => canSee(i.access));
+  // Leave is a regular-employee perk — hide "My leave" for probationary/other staff.
+  const leaveEligible = isLeaveEligible(profile.employment_status);
+  const items = NAV.filter((i) => canSee(i.access) && (i.to !== '/my/leave' || leaveEligible));
 
   const initials = profile.full_name
     .split(' ')

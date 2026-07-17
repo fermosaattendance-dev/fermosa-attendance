@@ -1,4 +1,4 @@
-import { LEAVE_STATUS_LABELS, countLeaveDays, type LeaveStatus } from '@fermosa/shared';
+import { LEAVE_STATUS_LABELS, countLeaveDays, isLeaveEligible, type LeaveStatus } from '@fermosa/shared';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -199,6 +199,27 @@ export default function LeaveScreen() {
       <SafeAreaView style={styles.safe}>
         <View style={styles.center}>
           <ActivityIndicator />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Leave is a regular-employee perk — probationary/other staff have none.
+  if (profile && !isLeaveEligible(profile.employment_status)) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <View style={styles.header}>
+          <Pressable onPress={() => router.back()}>
+            <Text style={styles.back}>‹ Back</Text>
+          </Pressable>
+          <Text style={styles.title}>Leave</Text>
+          <View style={{ width: 48 }} />
+        </View>
+        <View style={styles.body}>
+          <Text style={styles.muted}>
+            Leave becomes available once you’re a regular employee. Check with HR if you have
+            questions about your status.
+          </Text>
         </View>
       </SafeAreaView>
     );

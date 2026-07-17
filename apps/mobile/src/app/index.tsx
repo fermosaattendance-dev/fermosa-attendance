@@ -4,6 +4,7 @@ import {
   PUNCH_LABELS,
   SELFIE_PUNCH_TYPES,
   checkGeofence,
+  isLeaveEligible,
   nextAllowedPunchTypes,
   workStatusFromLastPunch,
   type PunchType,
@@ -176,9 +177,12 @@ export default function HomeScreen() {
     const key = `bday_seen.${profile.id}`;
     if (kvGetSync(key) === todayYmd) return;
     kvSetSync(key, todayYmd);
+    const perk = isLeaveEligible(profile.employment_status)
+      ? " Enjoy your day — don't forget your birthday leave this month 🎁"
+      : ' Enjoy your day! 🎁';
     Alert.alert(
       `🎂 Happy Birthday, ${profile.full_name.split(' ')[0]}!`,
-      "Wishing you a wonderful year ahead from the whole Fermosa team. Enjoy your day — don't forget your birthday leave this month 🎁",
+      `Wishing you a wonderful year ahead from the whole Fermosa team.${perk}`,
     );
   }, [profile?.id, profile?.birthday]);
 
@@ -341,9 +345,11 @@ export default function HomeScreen() {
               </Pressable>
             </View>
 
-            <Pressable style={styles.leaveLink} onPress={() => router.push('/leave')}>
-              <Text style={styles.leaveLinkText}>🏖️  Leave &amp; balances →</Text>
-            </Pressable>
+            {profile && isLeaveEligible(profile.employment_status) && (
+              <Pressable style={styles.leaveLink} onPress={() => router.push('/leave')}>
+                <Text style={styles.leaveLinkText}>🏖️  Leave &amp; balances →</Text>
+              </Pressable>
+            )}
 
             <Pressable style={styles.leaveLink} onPress={() => router.push('/change-password')}>
               <Text style={styles.leaveLinkText}>🔑  Change password →</Text>
