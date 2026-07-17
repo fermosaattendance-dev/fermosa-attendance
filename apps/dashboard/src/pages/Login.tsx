@@ -1,5 +1,6 @@
 import { usernameToEmail } from '@fermosa/shared';
 import { useState, type FormEvent } from 'react';
+import { InAppBrowserBanner } from '../components/InAppBrowserBanner';
 import { supabase } from '../lib/supabase';
 
 export function Login() {
@@ -47,6 +48,7 @@ export function Login() {
       {/* Form */}
       <div className="flex items-center justify-center bg-white px-6 py-12">
         <div className="w-full max-w-sm">
+          <InAppBrowserBanner />
           <h1 className="text-2xl font-bold tracking-tight text-ink">Welcome back</h1>
           <p className="mt-1 text-sm text-muted">Sign in to the manager &amp; HR dashboard.</p>
 

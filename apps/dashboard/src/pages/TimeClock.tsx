@@ -10,9 +10,11 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { CutoffSummary } from '../components/CutoffSummary';
+import { InAppBrowserBanner } from '../components/InAppBrowserBanner';
 import { PageHeader } from '../components/PageHeader';
 import { WebcamCapture } from '../components/WebcamCapture';
 import { useAuth } from '../lib/auth';
+import { detectInAppBrowser } from '../lib/inAppBrowser';
 import { readRovingBranch, writeRovingBranch } from '../lib/rovingBranch';
 import { supabase } from '../lib/supabase';
 import {
@@ -397,6 +399,8 @@ export function TimeClock() {
     <div className="mx-auto max-w-xl">
       <PageHeader title="My time clock" crumb="My time clock" subtitle={branch?.name} />
 
+      <InAppBrowserBanner />
+
       {!online && (
         <p className="mb-4 rounded-xl bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
           📡 You're offline — punches are saved on this device and will sync when you reconnect.
@@ -533,7 +537,11 @@ export function TimeClock() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-6">
           <div className="w-full max-w-sm rounded-2xl bg-white p-6 text-center">
             <p className="text-sm font-semibold text-ink">Your location is required to time in</p>
-            <p className="mt-2 text-sm text-muted">{LOCATION_HELP[locationBlocked]}</p>
+            <p className="mt-2 text-sm text-muted">
+              {detectInAppBrowser()
+                ? `You’re in the ${detectInAppBrowser()} browser, which can’t share your location. Open this page in Chrome — tap the ⋮ menu at the top-right → “Open in Chrome” (or “Open in browser”) — then log in and time in there.`
+                : LOCATION_HELP[locationBlocked]}
+            </p>
             <button onClick={retryLocation} className="btn-primary mt-4 w-full">
               Try again
             </button>
