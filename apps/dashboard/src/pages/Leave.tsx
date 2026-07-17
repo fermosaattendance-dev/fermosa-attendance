@@ -34,6 +34,7 @@ interface EmployeeLite {
   full_name: string;
   employee_code: string;
   branch_id: string | null;
+  birthday: string | null;
 }
 
 interface TypeLite {
@@ -41,6 +42,7 @@ interface TypeLite {
   name: string;
   is_paid: boolean;
   is_active: boolean;
+  birthday_only: boolean;
 }
 
 const STATUS_BADGE: Record<LeaveStatus, string> = {
@@ -102,12 +104,12 @@ export function Leave() {
     loadBalances();
     supabase
       .from('profiles')
-      .select('id, full_name, employee_code, branch_id')
+      .select('id, full_name, employee_code, branch_id, birthday')
       .order('full_name')
       .then(({ data }) => setEmployees((data as EmployeeLite[]) ?? []));
     supabase
       .from('leave_types')
-      .select('id, name, is_paid, is_active')
+      .select('id, name, is_paid, is_active, birthday_only')
       .order('name')
       .then(({ data }) => setTypes((data as TypeLite[]) ?? []));
   }, [loadRequests, loadBalances]);
@@ -317,11 +319,42 @@ function FileForEmployee({
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
 
+  const selectedEmp = employees.find((e) => e.id === employeeId) ?? null;
+  const selectedType = types.find((t) => t.id === typeId) ?? null;
+  const isBirthdayType = selectedType?.birthday_only ?? false;
+  const birthMonth = selectedEmp?.birthday ? Number(selectedEmp.birthday.slice(5, 7)) : null; // 1–12
+  const birthMonthName = birthMonth
+    ? new Date(2000, birthMonth - 1, 1).toLocaleString('en-US', { month: 'long' })
+    : '';
+  const yr = new Date().getFullYear();
+  const bmm = birthMonth ? String(birthMonth).padStart(2, '0') : '01';
+  const birthMonthMin = `${yr}-${bmm}-01`;
+  const birthMonthMax = birthMonth
+    ? `${yr}-${bmm}-${String(new Date(yr, birthMonth, 0).getDate()).padStart(2, '0')}`
+    : `${yr}-01-31`;
+  const startInBirthMonth = !!birthMonth && start.slice(5, 7) === bmm;
+  const birthdayBlocked = isBirthdayType && (!selectedEmp?.birthday || !startInBirthMonth);
+
+  // For Birthday Leave, snap the date into the selected employee's birth month.
+  useEffect(() => {
+    if (!isBirthdayType || !birthMonth) return;
+    setHalfDay(false);
+    if (start.slice(5, 7) !== bmm) setStart(birthMonthMin);
+  }, [isBirthdayType, birthMonth, bmm, start, birthMonthMin]);
+
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (!employeeId || !typeId || !start) return;
+    if (isBirthdayType && !selectedEmp?.birthday) {
+      onError('This employee has no birthday on file — add it on their profile first.');
+      return;
+    }
+    if (isBirthdayType && !startInBirthMonth) {
+      onError(`Birthday leave can only be taken in the employee's birth month (${birthMonthName}).`);
+      return;
+    }
     setBusy(true);
-    const endDate = halfDay ? start : end || start;
+    const endDate = halfDay || isBirthdayType ? start : end || start;
     const { error: err } = await supabase.from('leave_requests').insert({
       company_id: profile!.company_id,
       employee_id: employeeId,
@@ -386,25 +419,44 @@ function FileForEmployee({
           </select>
         </div>
         <div>
-          <label className={labelClass}>Start date</label>
-          <input type="date" value={start} onChange={(e) => setStart(e.target.value)} className={inputClass} required />
-        </div>
-        <div>
-          <label className={labelClass}>End date</label>
+          <label className={labelClass}>{isBirthdayType ? 'Day' : 'Start date'}</label>
           <input
             type="date"
-            value={halfDay ? start : end}
-            min={start}
-            disabled={halfDay}
-            onChange={(e) => setEnd(e.target.value)}
-            className={`${inputClass} disabled:bg-gray-100`}
+            value={start}
+            min={isBirthdayType ? birthMonthMin : undefined}
+            max={isBirthdayType ? birthMonthMax : undefined}
+            onChange={(e) => setStart(e.target.value)}
+            className={inputClass}
+            required
           />
         </div>
+        {!isBirthdayType && (
+          <div>
+            <label className={labelClass}>End date</label>
+            <input
+              type="date"
+              value={halfDay ? start : end}
+              min={start}
+              disabled={halfDay}
+              onChange={(e) => setEnd(e.target.value)}
+              className={`${inputClass} disabled:bg-gray-100`}
+            />
+          </div>
+        )}
       </div>
-      <label className="mt-3 flex items-center gap-2 text-sm text-gray-700">
-        <input type="checkbox" checked={halfDay} onChange={(e) => setHalfDay(e.target.checked)} />
-        Half day (single day, counts 0.5)
-      </label>
+      {isBirthdayType && (
+        <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          {selectedEmp?.birthday
+            ? `🎂 Birthday leave — one paid day, any day in ${selectedEmp.full_name.split(' ')[0]}'s birth month (${birthMonthName}).`
+            : '🎂 Birthday leave — this employee has no birthday on file. Add it on their profile first.'}
+        </p>
+      )}
+      {!isBirthdayType && (
+        <label className="mt-3 flex items-center gap-2 text-sm text-gray-700">
+          <input type="checkbox" checked={halfDay} onChange={(e) => setHalfDay(e.target.checked)} />
+          Half day (single day, counts 0.5)
+        </label>
+      )}
       <div className="mt-3">
         <label className={labelClass}>Reason</label>
         <input value={reason} onChange={(e) => setReason(e.target.value)} className={inputClass} placeholder="optional" />
@@ -412,8 +464,8 @@ function FileForEmployee({
       <div className="mt-4 flex gap-2">
         <button
           type="submit"
-          disabled={busy}
-          className="btn-primary"
+          disabled={busy || birthdayBlocked}
+          className="btn-primary disabled:opacity-50"
         >
           {busy ? 'Filing…' : 'File (pending)'}
         </button>

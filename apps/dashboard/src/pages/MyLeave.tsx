@@ -119,9 +119,11 @@ export function MyLeave() {
     : `${YEAR}-01-31`;
   const singleDay = halfDay || isBirthdayType; // birthday leave is one full day
   const endYmd = singleDay ? start : end;
+  // Birthday leave is a fixed 1-day perk on any day in the birth month (rest days
+  // included) — it isn't reduced by the working-day count like regular leave.
   const dayCount = useMemo(
-    () => countLeaveDays(start, endYmd, workDays, holidays, halfDay),
-    [start, endYmd, workDays, holidays, halfDay],
+    () => (isBirthdayType ? 1 : countLeaveDays(start, endYmd, workDays, holidays, halfDay)),
+    [isBirthdayType, start, endYmd, workDays, holidays, halfDay],
   );
   const balanceForType = balances.find((b) => b.leave_type_id === typeId) ?? null;
   const startInBirthMonth = !!birthMonth && start.slice(5, 7) === mm;
