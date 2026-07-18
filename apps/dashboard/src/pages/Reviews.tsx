@@ -30,6 +30,9 @@ interface RecordRow {
   flags: string[];
   // Minute overrides plus (since round 2) the corrected first_in/last_out ISO times.
   corrections: Record<string, number | string> | null;
+  // The shift the employee picked for this day (2-shift branch); null = branch Shift 1.
+  shift_start: string | null;
+  shift_end: string | null;
   employee: { id: string; full_name: string; employee_code: string } | null;
   branch: { name: string; shift_start: string; shift_end: string } | null;
   reviewer: { full_name: string } | null;
@@ -259,8 +262,10 @@ function CorrectionForm({
   if (inIso && outIso) {
     minutes = computeDayMinutes({
       workDate: record.work_date,
-      shiftStart: record.branch?.shift_start ?? '00:00',
-      shiftEnd: record.branch?.shift_end ?? '00:00',
+      // The shift the employee picked for this day (2-shift branch) wins over
+      // the branch default, so recomputed late matches what the engine used.
+      shiftStart: record.shift_start ?? record.branch?.shift_start ?? '00:00',
+      shiftEnd: record.shift_end ?? record.branch?.shift_end ?? '00:00',
       firstInIso: inIso,
       lastOutIso: outIso,
       punchedBreakMin: record.break_minutes ?? 0,
@@ -610,7 +615,7 @@ export function Reviews() {
     let q = supabase
       .from('attendance_records')
       .select(
-        'id, work_date, status, review_note, reviewed_at, first_in, last_out, worked_minutes, break_minutes, late_minutes, undertime_minutes, overtime_minutes, day_class, flags, corrections, employee:profiles!attendance_records_employee_id_fkey(id, full_name, employee_code), branch:branches(name, shift_start, shift_end), reviewer:profiles!attendance_records_reviewed_by_fkey(full_name)',
+        'id, work_date, status, review_note, reviewed_at, first_in, last_out, worked_minutes, break_minutes, late_minutes, undertime_minutes, overtime_minutes, day_class, flags, corrections, shift_start, shift_end, employee:profiles!attendance_records_employee_id_fkey(id, full_name, employee_code), branch:branches(name, shift_start, shift_end), reviewer:profiles!attendance_records_reviewed_by_fkey(full_name)',
       )
       .order('work_date', { ascending: false })
       .limit(100);

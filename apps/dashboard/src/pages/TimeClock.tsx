@@ -2,6 +2,7 @@ import {
   BREAKS_ENABLED,
   PUNCH_LABELS,
   SELFIE_PUNCH_TYPES,
+  branchShifts,
   checkGeofence,
   isLeaveEligible,
   nextAllowedPunchTypes,
@@ -35,6 +36,10 @@ interface BranchInfo {
   lat: number;
   lng: number;
   geofence_radius_m: number;
+  shift_start: string;
+  shift_end: string;
+  shift2_start: string | null;
+  shift2_end: string | null;
 }
 
 const STATUS_STYLE = {
@@ -127,6 +132,8 @@ export function TimeClock() {
   // Roving employees (no home branch) pick which branch they're at.
   const [branchOptions, setBranchOptions] = useState<{ id: string; name: string }[]>([]);
   const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
+  // Two-shift branch: the employee picks which shift they're timing in for.
+  const [selectedShift, setSelectedShift] = useState<{ start: string; end: string } | null>(null);
 
   const isRoving = !!profile && profile.branch_id === null;
   const effectiveBranchId = profile?.branch_id ?? selectedBranchId;
@@ -284,11 +291,35 @@ export function TimeClock() {
     if (!navigator.onLine) return;
     supabase
       .from('branches')
-      .select('id, name, lat, lng, geofence_radius_m')
+      .select('id, name, lat, lng, geofence_radius_m, shift_start, shift_end, shift2_start, shift2_end')
       .eq('id', effectiveBranchId)
       .maybeSingle()
       .then(({ data }) => setBranch((data as BranchInfo | null) ?? null));
   }, [effectiveBranchId]);
+
+  // Two shifts per branch: the employee picks which shift they're timing in for,
+  // remembered per day so time-out doesn't re-ask.
+  const shiftOptions = branch ? branchShifts(branch) : [];
+  const branchHasTwoShifts = shiftOptions.length > 1;
+  const manilaToday = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Manila' }).format(now);
+  const shiftKey = profile ? `fermosa.shift.${profile.id}.${manilaToday}` : null;
+  useEffect(() => {
+    if (!branchHasTwoShifts || !shiftKey) {
+      setSelectedShift(null);
+      return;
+    }
+    try {
+      const raw = localStorage.getItem(shiftKey);
+      const s = raw ? (JSON.parse(raw) as { start?: string; end?: string }) : null;
+      if (s?.start && s?.end) setSelectedShift({ start: s.start, end: s.end });
+    } catch {
+      /* ignore */
+    }
+  }, [branchHasTwoShifts, shiftKey]);
+  const pickShift = (opt: { start: string; end: string }) => {
+    setSelectedShift(opt);
+    if (shiftKey) localStorage.setItem(shiftKey, JSON.stringify(opt));
+  };
 
   const lastType: PunchType | null = punches.at(-1)?.type ?? null;
   const workStatus = workStatusFromLastPunch(lastType);
@@ -306,6 +337,12 @@ export function TimeClock() {
       const branchId = profile.branch_id ?? selectedBranchId;
       if (!branchId) {
         setError('Pick the branch you are working at first.');
+        return;
+      }
+      const twoShifts = !!branch?.shift2_start;
+      const shift = twoShifts ? selectedShift : null;
+      if (twoShifts && !shift) {
+        setError('Pick which shift you are timing in for first.');
         return;
       }
       setBusy(true);
@@ -329,7 +366,7 @@ export function TimeClock() {
           }
           requiredGps = { gps: res.fix };
         }
-        const { gps } = await recordPunch({ profile, branchId, type, selfieB64, ...requiredGps });
+        const { gps } = await recordPunch({ profile, branchId, type, selfieB64, ...requiredGps, shift });
         if (!navigator.onLine) {
           setNote(
             `${PUNCH_LABELS[type]} saved on this device — it will sync automatically when you're back online.`,
@@ -352,7 +389,7 @@ export function TimeClock() {
       }
       setBusy(false);
     },
-    [profile, branch, selectedBranchId, refreshLocal],
+    [profile, branch, selectedBranchId, selectedShift, refreshLocal],
   );
 
   const onAction = (type: PunchType) => {
@@ -452,12 +489,43 @@ export function TimeClock() {
         </div>
       )}
 
+      {branchHasTwoShifts && (
+        <div className="card mt-4 px-4 py-4">
+          <span className="block text-xs font-medium text-gray-500">
+            Which shift are you timing in for today?
+          </span>
+          <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {shiftOptions.map((s) => {
+              const active = selectedShift?.start === s.start && selectedShift?.end === s.end;
+              return (
+                <button
+                  key={`${s.start}-${s.end}`}
+                  onClick={() => pickShift({ start: s.start, end: s.end })}
+                  className={`rounded-xl border px-3 py-2 text-sm font-semibold transition ${
+                    active
+                      ? 'border-brand-600 bg-brand-50 text-brand-700'
+                      : 'border-line bg-white text-ink hover:bg-ground'
+                  }`}
+                >
+                  {s.label}
+                </button>
+              );
+            })}
+          </div>
+          {!selectedShift && (
+            <p className="mt-2 text-xs text-amber-700">
+              Pick your shift so late is measured against the right start time.
+            </p>
+          )}
+        </div>
+      )}
+
       <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
         {allowed.map((type) => (
           <button
             key={type}
             onClick={() => onAction(type)}
-            disabled={busy || (isRoving && !selectedBranchId)}
+            disabled={busy || (isRoving && !selectedBranchId) || (branchHasTwoShifts && !selectedShift)}
             className={`rounded-2xl py-5 text-lg font-bold text-white transition disabled:opacity-50 ${
               type === 'clock_in'
                 ? 'bg-green-600 hover:bg-green-700'

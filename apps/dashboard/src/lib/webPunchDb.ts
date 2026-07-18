@@ -16,6 +16,8 @@ export interface LocalPunch {
   type: PunchType;
   happened_at: string; // ISO, device time — the official punch time
   branch_id: string | null;
+  shift_start: string | null; // shift picked at time-in (null = branch Shift 1)
+  shift_end: string | null;
   lat: number | null;
   lng: number | null;
   gps_accuracy_m: number | null;
@@ -56,6 +58,8 @@ export async function insertPunch(p: {
   type: PunchType;
   happened_at: string;
   branch_id: string | null;
+  shift_start?: string | null;
+  shift_end?: string | null;
   lat: number | null;
   lng: number | null;
   gps_accuracy_m: number | null;
@@ -65,6 +69,8 @@ export async function insertPunch(p: {
   const d = await db();
   await d.put('punches', {
     ...p,
+    shift_start: p.shift_start ?? null,
+    shift_end: p.shift_end ?? null,
     sync_status: 'pending_sync',
     attempts: 0,
     last_error: null,
@@ -154,6 +160,8 @@ export async function upsertSynced(p: {
     type: p.type,
     happened_at: p.happened_at,
     branch_id: p.branch_id,
+    shift_start: null,
+    shift_end: null,
     lat: null,
     lng: null,
     gps_accuracy_m: null,

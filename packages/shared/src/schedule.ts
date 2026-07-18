@@ -60,3 +60,28 @@ export function formatShift(shiftStart: string, shiftEnd: string): string {
   const base = `${to12Hour(shiftStart)} – ${to12Hour(shiftEnd)}`;
   return isOvernight(shiftStart, shiftEnd) ? `${base} +1` : base;
 }
+
+export interface ShiftOption {
+  start: string; // 'HH:MM' or 'HH:MM:SS'
+  end: string;
+  label: string; // e.g. "9:00 AM – 6:00 PM"
+}
+
+/**
+ * The 1–2 selectable shifts for a branch. Shift 2 is included only when the
+ * branch defines it — that's the signal to show a shift picker at time-in.
+ */
+export function branchShifts(b: {
+  shift_start: string;
+  shift_end: string;
+  shift2_start?: string | null;
+  shift2_end?: string | null;
+}): ShiftOption[] {
+  const out: ShiftOption[] = [
+    { start: b.shift_start, end: b.shift_end, label: formatShift(b.shift_start, b.shift_end) },
+  ];
+  if (b.shift2_start && b.shift2_end) {
+    out.push({ start: b.shift2_start, end: b.shift2_end, label: formatShift(b.shift2_start, b.shift2_end) });
+  }
+  return out;
+}

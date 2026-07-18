@@ -161,9 +161,13 @@ export interface Branch {
   geofence_radius_m: number;
   timezone: string;
   is_active: boolean;
-  /** Branch default schedule (per-employee shifts arrive with scheduling). */
+  /** Branch Shift 1 (the default). */
   shift_start: string; // 'HH:MM:SS'
   shift_end: string;
+  /** Optional Shift 2 — when set, the branch runs two shifts and staff pick
+   *  which one they are timing in for. Null = single-shift branch. */
+  shift2_start: string | null;
+  shift2_end: string | null;
   work_days: number[]; // ISO weekday numbers, 1 = Monday … 7 = Sunday
 }
 
@@ -215,6 +219,9 @@ export interface AttendanceEvent {
   distance_from_branch_m: number | null;
   selfie_path: string | null;
   device_info: Record<string, unknown> | null;
+  /** Shift the employee picked for this punch (null = branch Shift 1). */
+  shift_start: string | null;
+  shift_end: string | null;
 }
 
 /** Payload for the `admin-users` Edge Function: create an employee account. */
@@ -255,6 +262,9 @@ export interface QueuedPunch {
   selfie_local_uri: string | null;
   /** Null only transiently for a roving employee's queue row (both queues store it per punch). */
   branch_id: string | null;
+  /** Shift picked at time-in for a 2-shift branch (null = branch Shift 1). */
+  shift_start?: string | null;
+  shift_end?: string | null;
   sync_status: 'pending_sync' | 'syncing' | 'synced' | 'failed';
   attempts: number;
 }

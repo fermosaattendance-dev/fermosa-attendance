@@ -25,6 +25,8 @@ const emptyForm = {
   is_active: true,
   shift_start: '10:00',
   shift_end: '19:00',
+  shift2_start: '', // blank = single-shift branch
+  shift2_end: '',
   work_days: [1, 2, 3, 4, 5, 6] as number[],
 };
 
@@ -64,6 +66,8 @@ export function Branches() {
       is_active: b.is_active,
       shift_start: b.shift_start.slice(0, 5),
       shift_end: b.shift_end.slice(0, 5),
+      shift2_start: b.shift2_start?.slice(0, 5) ?? '',
+      shift2_end: b.shift2_end?.slice(0, 5) ?? '',
       work_days: b.work_days ?? [1, 2, 3, 4, 5, 6],
     });
     setError(null);
@@ -120,6 +124,8 @@ export function Branches() {
       is_active: form.is_active,
       shift_start: form.shift_start,
       shift_end: form.shift_end,
+      shift2_start: form.shift2_start || null,
+      shift2_end: form.shift2_end || null,
       work_days: form.work_days,
     };
     if (form.work_days.length === 0) {
@@ -129,6 +135,16 @@ export function Branches() {
     }
     if (form.shift_start === form.shift_end) {
       setError('Shift start and end cannot be the same. For an overnight shift, set an end time earlier than the start (e.g. 22:00 → 06:00).');
+      setBusy(false);
+      return;
+    }
+    if (Boolean(form.shift2_start) !== Boolean(form.shift2_end)) {
+      setError('Shift 2 needs both a start and an end — or leave both blank for a single-shift branch.');
+      setBusy(false);
+      return;
+    }
+    if (form.shift2_start && form.shift2_start === form.shift2_end) {
+      setError('Shift 2 start and end cannot be the same.');
       setBusy(false);
       return;
     }
@@ -211,6 +227,18 @@ export function Branches() {
                   Ends the next day (+1) — overnight shift. Late/overtime and the work day follow the day the shift starts.
                 </p>
               )}
+            </div>
+            <div>
+              <label className={labelClass}>Shift 2 start (optional)</label>
+              <input type="time" value={form.shift2_start} onChange={(e) => setForm({ ...form, shift2_start: e.target.value })} className={inputClass} />
+            </div>
+            <div>
+              <label className={labelClass}>Shift 2 end (optional)</label>
+              <input type="time" value={form.shift2_end} onChange={(e) => setForm({ ...form, shift2_end: e.target.value })} className={inputClass} />
+              <p className="mt-1 text-xs text-gray-500">
+                Set a 2nd shift for a two-shift branch — staff pick which shift they're timing in for, and late
+                is measured against it. Leave blank for a single-shift branch.
+              </p>
             </div>
           </div>
 
@@ -329,7 +357,8 @@ export function Branches() {
                   {b.lat.toFixed(4)}, {b.lng.toFixed(4)}
                 </td>
                 <td className="px-4 py-2 text-xs text-gray-600">
-                  {formatShift(b.shift_start, b.shift_end)} ·{' '}
+                  {formatShift(b.shift_start, b.shift_end)}
+                  {b.shift2_start && b.shift2_end && ` + ${formatShift(b.shift2_start, b.shift2_end)}`} ·{' '}
                   {(b.work_days ?? []).map((d) => DAY_LABELS[d - 1]).join(' ')}
                 </td>
                 <td className="px-4 py-2 text-gray-600">{b.geofence_radius_m} m</td>

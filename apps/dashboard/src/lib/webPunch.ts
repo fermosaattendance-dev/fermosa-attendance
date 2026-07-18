@@ -106,6 +106,8 @@ export async function recordPunch(args: {
   selfieB64: string | null;
   /** Pre-acquired fix (required-GPS flow). When omitted, best-effort lookup. */
   gps?: GpsFix | null;
+  /** Shift picked at time-in for a 2-shift branch (null = branch Shift 1). */
+  shift?: { start: string; end: string } | null;
 }): Promise<{ gps: GpsFix | null }> {
   const clientUuid = uuid();
   const gps = args.gps !== undefined ? args.gps : await tryGetLocation();
@@ -115,6 +117,8 @@ export async function recordPunch(args: {
     type: args.type,
     happened_at: new Date().toISOString(),
     branch_id: args.branchId,
+    shift_start: args.shift?.start ?? null,
+    shift_end: args.shift?.end ?? null,
     lat: gps?.lat ?? null,
     lng: gps?.lng ?? null,
     gps_accuracy_m: gps?.accuracy ?? null,
@@ -171,6 +175,8 @@ export async function syncPending(profile: Profile): Promise<{ synced: number; f
         p_source: 'web',
         p_device_info: row.device_info ? JSON.parse(row.device_info) : null,
         p_selfie_path: selfiePath,
+        p_shift_start: row.shift_start ?? null,
+        p_shift_end: row.shift_end ?? null,
       });
       if (error) {
         await markFailed(row.client_uuid, error.message);
