@@ -240,6 +240,12 @@ function CorrectionForm({
     return t ? timeInputFmt.format(new Date(t)) : '';
   });
   const [note, setNote] = useState('');
+  // Discretionary payroll minutes — default to the computed values (re-synced
+  // whenever the times change below) but hand-editable so HR can grant/waive a
+  // late (set to 0), excuse undertime, or adjust OT while keeping the real time.
+  const [lateMin, setLateMin] = useState('');
+  const [undertimeMin, setUndertimeMin] = useState('');
+  const [otMin, setOtMin] = useState('');
 
   // 'HH:MM' on the work date (Manila) → ISO. The out time rolls to the next
   // day when it isn't after the in time (overnight shifts).
@@ -268,11 +274,25 @@ function CorrectionForm({
     }
   }
 
+  // Re-sync the editable minutes to the computed values whenever the times
+  // change; the reviewer can then override any of them by hand.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (minutes) {
+      setLateMin(String(minutes.late_minutes));
+      setUndertimeMin(String(minutes.undertime_minutes));
+      setOtMin(String(minutes.overtime_minutes));
+    }
+  }, [inIso, outIso]);
+
+  const clampMin = (v: string) => Math.max(0, Math.round(Number(v) || 0));
+
   return (
     <div className="border-t border-gray-200 bg-amber-50 px-4 py-3">
       <p className="text-xs font-semibold text-amber-800">
-        Correct this day — enter the actual times; worked, late and OT are recalculated
-        automatically.
+        Correct this day — enter the actual times; Late / Undertime / OT default to the computed
+        values, edit them to waive or grant (e.g. set Late to 0 to excuse a late). Worked hours
+        follow the times.
       </p>
       <div className="mt-2 flex flex-wrap items-end gap-3">
         <label className="text-xs text-gray-600">
@@ -285,6 +305,21 @@ function CorrectionForm({
           <input type="time" value={outTime} onChange={(e) => setOutTime(e.target.value)}
             className="mt-1 block input" />
         </label>
+        <label className="w-24 text-xs text-gray-600">
+          Late (min)
+          <input type="number" min={0} value={lateMin} onChange={(e) => setLateMin(e.target.value)}
+            className="mt-1 block w-full input" />
+        </label>
+        <label className="w-28 text-xs text-gray-600">
+          Undertime (min)
+          <input type="number" min={0} value={undertimeMin} onChange={(e) => setUndertimeMin(e.target.value)}
+            className="mt-1 block w-full input" />
+        </label>
+        <label className="w-24 text-xs text-gray-600">
+          OT (min)
+          <input type="number" min={0} value={otMin} onChange={(e) => setOtMin(e.target.value)}
+            className="mt-1 block w-full input" />
+        </label>
         <label className="min-w-64 flex-1 text-xs text-gray-600">
           Reason (required)
           <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. forgot to time out, confirmed with branch manager"
@@ -293,7 +328,15 @@ function CorrectionForm({
         <button
           onClick={() => {
             if (!minutes || !inIso || !outIso) return;
-            onSave(note, { first_in: inIso, last_out: outIso, ...minutes });
+            onSave(note, {
+              first_in: inIso,
+              last_out: outIso,
+              worked_minutes: minutes.worked_minutes,
+              break_minutes: minutes.break_minutes,
+              late_minutes: clampMin(lateMin),
+              undertime_minutes: clampMin(undertimeMin),
+              overtime_minutes: clampMin(otMin),
+            });
           }}
           disabled={!note.trim() || !minutes}
           className="btn-primary"
@@ -306,7 +349,7 @@ function CorrectionForm({
       </div>
       <p className="mt-2 text-xs text-amber-800">
         {minutes
-          ? `→ worked ${fmtMinutes(minutes.worked_minutes)} · late ${minutes.late_minutes}m · undertime ${minutes.undertime_minutes}m · OT ${minutes.overtime_minutes}m (break ${minutes.break_minutes}m deducted)`
+          ? `→ worked ${fmtMinutes(minutes.worked_minutes)} · late ${clampMin(lateMin)}m · undertime ${clampMin(undertimeMin)}m · OT ${clampMin(otMin)}m (break ${minutes.break_minutes}m deducted)`
           : 'Enter the time in and time out (out must be after in).'}
       </p>
     </div>
