@@ -9,7 +9,8 @@ independent copy kept on GitHub.
 - **`scripts/backup/backup.mjs`** exports every business table + the auth account
   roster to one JSON snapshot and uploads it to the private **`backups`** bucket
   at `‹label›/‹date›.json`. It creates the bucket on first run and prunes daily
-  snapshots older than `RETENTION_DAYS` (default 90).
+  snapshots older than `RETENTION_DAYS` (default `0` = **keep forever**; set a
+  positive number of days to auto-delete older snapshots).
 - **`.github/workflows/backup.yml`** runs it **twice daily — 12:00 noon and
   11:00 PM Manila** (kept as separate `‹date›-noon.json` / `‹date›-night.json`
   files, so both recovery points survive) — and on the **"Run workflow"** button

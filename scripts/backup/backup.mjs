@@ -16,7 +16,8 @@
 //   BACKUP_BUCKET  private storage bucket              (default 'backups')
 //   BACKUP_KIND    'daily' | 'manual'                  (default 'daily')
 //   BACKUP_SLOT    'noon' | 'night' | ''  (daily runs) (default '')
-//   RETENTION_DAYS keep this many days of snapshots     (default 90)
+//   RETENTION_DAYS delete snapshots older than this many days; 0 = keep forever
+//                                                       (default 0 = forever)
 //   BACKUP_OUT_DIR local dir for the artifact copy     (default 'backup-out')
 import { createClient } from '@supabase/supabase-js';
 import { mkdirSync, writeFileSync, statSync } from 'node:fs';
@@ -29,7 +30,7 @@ const LABEL = (process.env.BACKUP_LABEL || 'fermosa').trim();
 const BUCKET = (process.env.BACKUP_BUCKET || 'backups').trim();
 const KIND = process.env.BACKUP_KIND === 'manual' ? 'manual' : 'daily';
 const SLOT = (process.env.BACKUP_SLOT || '').trim();
-const RETENTION_DAYS = Number(process.env.RETENTION_DAYS || 90);
+const RETENTION_DAYS = Number(process.env.RETENTION_DAYS || 0); // 0 = keep forever
 const OUT_DIR = process.env.BACKUP_OUT_DIR || 'backup-out';
 
 function requireEnv(name) {
@@ -86,10 +87,11 @@ async function dumpAuthUsers() {
   return users;
 }
 
-// Delete snapshots older than RETENTION_DAYS. Matches every naming pattern
-// (YYYY-MM-DD.json, YYYY-MM-DD-noon/night.json, manual-YYYY-MM-DD...json) by the
-// date embedded in the filename.
+// Delete snapshots older than RETENTION_DAYS. RETENTION_DAYS = 0 keeps every
+// backup forever (default). Matches every naming pattern (YYYY-MM-DD.json,
+// YYYY-MM-DD-noon/night.json, manual-YYYY-MM-DD...json) by the date in the name.
 async function prune() {
+  if (!RETENTION_DAYS || RETENTION_DAYS <= 0) return; // keep forever
   const { data, error } = await db.storage.from(BUCKET).list(LABEL, { limit: 1000 });
   if (error) return; // non-fatal — never fail a backup over cleanup
   const cutoff = Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000;
