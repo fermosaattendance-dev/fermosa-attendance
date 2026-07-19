@@ -115,7 +115,7 @@ the dashboard workspace → `apps/dashboard/dist`) and the SPA rewrite, so the
 build needs no manual config.
 
 1. At <https://vercel.com> → Add New → Project → import the GitHub repo
-   (`jomarvasquez14-oss/fermosa-attendance`). Leave **Root Directory = repo root**
+   (`fermosaattendance-dev/fermosa-attendance`). Leave **Root Directory = repo root**
    (vercel.json drives the build); Framework preset = Other.
 2. Project → Settings → Environment Variables → add for **Production**:
    ```
