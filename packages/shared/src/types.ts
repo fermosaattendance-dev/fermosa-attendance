@@ -133,6 +133,43 @@ export interface PayrollAdjustments {
   updated_at: string;
 }
 
+/** A pay period's release state. Employees see payslips only once deployed. */
+export interface PayrollPeriod {
+  company_id: string;
+  period_start: string;
+  period_end: string;
+  published_at: string | null;
+  published_by: string | null;
+}
+
+/** One row of my_payslip() — the employee's own payslip for a deployed period. */
+export interface MyPayslipRow {
+  employee_id: string;
+  employee_code: string;
+  full_name: string;
+  branch_name: string | null;
+  date_hired: string | null;
+  leave_remaining: number;
+  daily_rate: number | null;
+  daily_allowance: number | null;
+  days_present: number;
+  full_days: number;
+  paid_leave_days: number;
+  ot_paid_hours: number;
+  ot_pay: number | null;
+  period_start: string;
+  period_end: string;
+  add_allowance: number;
+  holiday_pay: number;
+  others_less: number;
+  adjustment_less: number;
+  cash_advance: number;
+  sss: number;
+  philhealth: number;
+  pagibig: number;
+  others: number;
+}
+
 /** Status of a payroll → Google Sheets push. */
 export type PayrollSyncStatus = 'synced' | 'dry_run' | 'failed';
 

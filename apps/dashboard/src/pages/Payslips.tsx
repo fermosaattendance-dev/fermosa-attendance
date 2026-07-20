@@ -10,6 +10,7 @@ import {
 } from '@fermosa/shared';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { PageHeader } from '../components/PageHeader';
+import { PayslipView } from '../components/PayslipView';
 import { useAuth } from '../lib/auth';
 import { exportXlsx, type Cell } from '../lib/exportTable';
 import { matchByCode, parseSheet, readPayslipSheet, type ParsedRow } from '../lib/importTable';
@@ -47,7 +48,11 @@ const AMOUNT_FIELDS: { key: keyof PayslipManualAmounts; label: string }[] = [
 const peso = (n: number) =>
   n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-const dateFmt = new Intl.DateTimeFormat('en-PH', { month: 'long', day: 'numeric', year: 'numeric' });
+const stampFmt = new Intl.DateTimeFormat('en-PH', {
+  timeZone: 'Asia/Manila',
+  dateStyle: 'medium',
+  timeStyle: 'short',
+});
 
 interface AdjRow extends PayslipManualAmounts {
   employee_id: string;
@@ -73,11 +78,11 @@ export function Payslips() {
   const [hired, setHired] = useState<Record<string, string | null>>({});
   const [leaveLeft, setLeaveLeft] = useState<Record<string, number>>({});
   const [codes, setCodes] = useState<{ id: string; code: string; name: string }[]>([]);
+  const [publishedAt, setPublishedAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  // Upload preview (nothing is written until Apply).
   const [preview, setPreview] = useState<PreviewRow[] | null>(null);
   const [previewNote, setPreviewNote] = useState<string | null>(null);
   const [applying, setApplying] = useState(false);
@@ -87,11 +92,15 @@ export function Payslips() {
     return half === 1 ? first! : second!;
   }, [year, month, half]);
 
+  // A deployed cutoff is final: staff can see it, so the amounts lock (the DB
+  // enforces this too — the UI just matches).
+  const isDeployed = !!publishedAt;
+
   const load = useCallback(async () => {
     if (!isAdmin) return;
     setLoading(true);
     setError(null);
-    const [sum, adj, profs, bal] = await Promise.all([
+    const [sum, adj, profs, bal, per] = await Promise.all([
       supabase.rpc('report_payroll_summary', {
         p_from: period.start,
         p_to: period.end,
@@ -99,10 +108,15 @@ export function Payslips() {
       }),
       supabase.from('payroll_adjustments').select('*').eq('period_start', period.start),
       supabase.from('profiles').select('id, employee_code, full_name, date_hired').order('full_name'),
-      supabase.from('leave_balances_view').select('employee_id, remaining_days').eq('year', new Date().getFullYear()),
+      supabase
+        .from('leave_balances_view')
+        .select('employee_id, remaining_days')
+        .eq('year', new Date().getFullYear()),
+      supabase.from('payroll_periods').select('published_at').eq('period_start', period.start).maybeSingle(),
     ]);
     if (sum.error) setError(sum.error.message);
     setSummary((sum.data as PayrollSummaryRow[]) ?? []);
+    setPublishedAt(((per.data as { published_at: string | null } | null) ?? null)?.published_at ?? null);
 
     const map: Record<string, PayslipManualAmounts> = {};
     for (const r of ((adj.data as AdjRow[]) ?? [])) {
@@ -120,7 +134,8 @@ export function Payslips() {
     }
     setAdjustments(map);
 
-    const rows = (profs.data as { id: string; employee_code: string; full_name: string; date_hired: string | null }[]) ?? [];
+    const rows =
+      (profs.data as { id: string; employee_code: string; full_name: string; date_hired: string | null }[]) ?? [];
     setCodes(rows.map((p) => ({ id: p.id, code: p.employee_code, name: p.full_name })));
     setHired(Object.fromEntries(rows.map((p) => [p.id, p.date_hired])));
 
@@ -138,28 +153,56 @@ export function Payslips() {
 
   const amountsFor = (id: string): PayslipManualAmounts => adjustments[id] ?? { ...EMPTY_MANUAL_AMOUNTS };
 
+  // ---- Deploy --------------------------------------------------------------
+  const deploy = async () => {
+    if (
+      !window.confirm(
+        `Deploy the ${formatPeriodLabel(period)} payslips to all ${summary.length} employee(s)?\n\n` +
+          'They will be able to see their own payslip, and the amounts will lock until you un-deploy.',
+      )
+    )
+      return;
+    setError(null);
+    const { error: e } = await supabase.rpc('publish_payroll_period', {
+      p_period_start: period.start,
+      p_period_end: period.end,
+    });
+    if (e) setError(e.message);
+    else {
+      setNotice(`Deployed — staff can now see their ${formatPeriodLabel(period)} payslip.`);
+      void load();
+    }
+  };
+
+  const undeploy = async () => {
+    if (!window.confirm('Un-deploy this cutoff? Staff will stop seeing it and you can edit again.')) return;
+    setError(null);
+    const { error: e } = await supabase.rpc('unpublish_payroll_period', { p_period_start: period.start });
+    if (e) setError(e.message);
+    else {
+      setNotice('Un-deployed — the amounts are editable again.');
+      void load();
+    }
+  };
+
   // ---- Template ------------------------------------------------------------
   const downloadTemplate = () => {
-    const byId = new Map(summary.map((s) => [s.employee_id, s]));
-    // Everyone with a profile, so a new hire with no attendance is still listed.
-    const rows: Cell[][] = codes
-      .filter((c) => byId.has(c.id) || true)
-      .map((c) => {
-        const a = amountsFor(c.id);
-        return [
-          c.code,
-          c.name,
-          a.add_allowance || '',
-          a.holiday_pay || '',
-          a.others_less || '',
-          a.adjustment_less || '',
-          a.cash_advance || '',
-          a.sss || '',
-          a.philhealth || '',
-          a.pagibig || '',
-          a.others || '',
-        ];
-      });
+    const rows: Cell[][] = codes.map((c) => {
+      const a = amountsFor(c.id);
+      return [
+        c.code,
+        c.name,
+        a.add_allowance || '',
+        a.holiday_pay || '',
+        a.others_less || '',
+        a.adjustment_less || '',
+        a.cash_advance || '',
+        a.sss || '',
+        a.philhealth || '',
+        a.pagibig || '',
+        a.others || '',
+      ];
+    });
     exportXlsx(`payroll-input_${period.start}_to_${period.end}`, [
       { name: 'Payroll input', headers: TEMPLATE_HEADERS, rows },
     ]);
@@ -253,17 +296,18 @@ export function Payslips() {
     );
   }
 
-  const totals = row && draft
-    ? computePayslip({
-        daily_rate: Number(row.daily_rate ?? 0),
-        daily_allowance: Number(row.daily_allowance ?? 0),
-        days_present: row.days_present,
-        full_days: row.full_days,
-        paid_leave_days: row.paid_leave_days,
-        ot_pay: Number(row.ot_pay ?? 0),
-        ...draft,
-      })
-    : null;
+  const totals =
+    row && draft
+      ? computePayslip({
+          daily_rate: Number(row.daily_rate ?? 0),
+          daily_allowance: Number(row.daily_allowance ?? 0),
+          days_present: row.days_present,
+          full_days: row.full_days,
+          paid_leave_days: row.paid_leave_days,
+          ot_pay: Number(row.ot_pay ?? 0),
+          ...draft,
+        })
+      : null;
 
   const employeeName = codes.find((c) => c.id === employeeId)?.name ?? '';
   const matched = preview?.filter((r) => r.employee_id && !r.invalid.length).length ?? 0;
@@ -279,7 +323,6 @@ export function Payslips() {
           subtitle="Attendance figures are computed; the other amounts come from your uploaded sheet."
         />
 
-        {/* Period + template/upload toolbar */}
         <div className="flex flex-wrap items-end gap-3 card p-4">
           <label className="text-sm">
             <span className="block text-xs font-medium text-gray-500">Month</span>
@@ -315,35 +358,63 @@ export function Payslips() {
             </div>
           </div>
           <div className="ml-auto flex flex-wrap items-center gap-2">
-            <button onClick={downloadTemplate} className="btn">
-              Download template
-            </button>
-            <label className="btn-primary cursor-pointer">
-              Upload filled sheet
-              <input
-                type="file"
-                accept=".xlsx,.xls,.csv"
-                className="hidden"
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) void onFile(f);
-                  e.target.value = '';
-                }}
-              />
-            </label>
+            {!isDeployed && (
+              <>
+                <button onClick={downloadTemplate} className="btn">
+                  Download template
+                </button>
+                <label className="btn cursor-pointer">
+                  Upload filled sheet
+                  <input
+                    type="file"
+                    accept=".xlsx,.xls,.csv"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) void onFile(f);
+                      e.target.value = '';
+                    }}
+                  />
+                </label>
+              </>
+            )}
+            {isDeployed ? (
+              <button onClick={() => void undeploy()} className="btn">
+                Un-deploy
+              </button>
+            ) : (
+              <button onClick={() => void deploy()} disabled={summary.length === 0} className="btn-primary disabled:opacity-50">
+                Deploy to staff
+              </button>
+            )}
           </div>
         </div>
 
-        <p className="mt-2 text-xs text-gray-500">
-          Fill the template in Excel and upload it once for the whole period — rows are matched on
-          employee code. Employees left out of the sheet keep whatever they already had.
-        </p>
+        {/* Release state */}
+        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+          {isDeployed ? (
+            <>
+              <span className="pill bg-green-100 text-green-700">
+                Deployed {publishedAt ? stampFmt.format(new Date(publishedAt)) : ''}
+              </span>
+              <span className="text-gray-500">
+                Staff can see this cutoff. Amounts are locked — un-deploy to make corrections.
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="pill bg-amber-100 text-amber-700">Draft</span>
+              <span className="text-gray-500">
+                Not visible to staff yet. Fill the template, upload it once for the whole period, then Deploy.
+              </span>
+            </>
+          )}
+        </div>
 
         {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
         {notice && <p className="mt-3 text-sm text-green-700">{notice}</p>}
         {loading && <p className="mt-3 text-sm text-muted">Loading…</p>}
 
-        {/* Upload preview — nothing is written until Apply */}
         {preview && (
           <div className="mt-4 card p-4">
             <h3 className="text-sm font-semibold text-ink">Check before applying</h3>
@@ -390,7 +461,11 @@ export function Payslips() {
               </table>
             </div>
             <div className="mt-3 flex gap-2">
-              <button onClick={() => void applyPreview()} disabled={applying || matched === 0} className="btn-primary disabled:opacity-50">
+              <button
+                onClick={() => void applyPreview()}
+                disabled={applying || matched === 0}
+                className="btn-primary disabled:opacity-50"
+              >
                 {applying ? 'Applying…' : `Apply to ${matched} employee(s)`}
               </button>
               <button onClick={() => setPreview(null)} className="btn">Cancel</button>
@@ -398,7 +473,6 @@ export function Payslips() {
           </div>
         )}
 
-        {/* Employee picker */}
         <div className="mt-4 flex flex-wrap items-end gap-3 card p-4">
           <label className="text-sm flex-1">
             <span className="block text-xs font-medium text-gray-500">Employee</span>
@@ -413,136 +487,48 @@ export function Payslips() {
           </label>
           {row && (
             <>
-              <button onClick={() => void saveOne()} className="btn-primary">Save amounts</button>
+              {!isDeployed && (
+                <button onClick={() => void saveOne()} className="btn-primary">
+                  Save amounts
+                </button>
+              )}
               <button onClick={() => window.print()} className="btn">Print</button>
             </>
           )}
         </div>
       </div>
 
-      {/* ---------------- The payslip ---------------- */}
       {employeeId && !row && !loading && (
         <div className="mt-4 card p-6 text-sm text-muted no-print">
-          No approved attendance for this employee in {formatPeriodLabel(period)}. Approve their days
-          on Reviews first.
+          No approved attendance for this employee in {formatPeriodLabel(period)}. Approve their days on
+          Reviews first.
         </div>
       )}
 
       {row && totals && draft && (
-        <div id="payslip" className="mt-4 card p-6">
-          <div className="flex flex-wrap items-start justify-between gap-3 border-b border-line pb-3">
-            <div>
-              <h2 className="text-lg font-bold text-ink">{employeeName}</h2>
-              <p className="text-xs text-muted">{row.employee_code} · {row.branch_name}</p>
-            </div>
-            <div className="text-right text-xs text-muted">
-              <div className="font-semibold text-ink">{formatPeriodLabel(period)}</div>
-              <div>{dateFmt.format(new Date(`${period.start}T00:00:00`))} – {dateFmt.format(new Date(`${period.end}T00:00:00`))}</div>
-            </div>
-          </div>
-
-          <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-1 text-sm sm:grid-cols-4">
-            <div><dt className="text-xs text-muted">Employment date</dt>
-              <dd className="font-medium text-ink">{hired[employeeId] ? dateFmt.format(new Date(`${hired[employeeId]}T00:00:00`)) : '—'}</dd></div>
-            <div><dt className="text-xs text-muted">Leave remaining</dt>
-              <dd className="font-medium text-ink">{leaveLeft[employeeId] ?? 0}</dd></div>
-            <div><dt className="text-xs text-muted">Daily rate</dt>
-              <dd className="font-medium text-ink">₱{peso(Number(row.daily_rate ?? 0))}</dd></div>
-            <div><dt className="text-xs text-muted">Allowance / full day</dt>
-              <dd className="font-medium text-ink">₱{peso(Number(row.daily_allowance ?? 0))}</dd></div>
-          </dl>
-
-          {row.daily_rate === null && (
-            <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
-              No daily rate set for this employee — set it on their profile first.
-            </p>
-          )}
-
-          <table className="mt-4 w-full text-sm">
-            <tbody>
-              <Line label={formatPeriodLabel(period)} remark={`${row.days_present} days present`} value={totals.basic} strong />
-              <Line label="Allowance" remark={`${row.full_days} full days`} value={totals.allowance} />
-              {totals.paid_leave > 0 && <Line label="Paid leave" remark={`${row.paid_leave_days} days`} value={totals.paid_leave} />}
-              {totals.overtime > 0 && <Line label="Overtime" remark={`${row.ot_paid_hours} hrs`} value={totals.overtime} />}
-              <EditLine label="Add allowance" field="add_allowance" draft={draft} setDraft={setDraft} />
-              <EditLine label="Holiday" field="holiday_pay" draft={draft} setDraft={setDraft} />
-              <EditLine label="Others less" field="others_less" draft={draft} setDraft={setDraft} negative />
-              <EditLine
-                label="Adjustment less"
-                field="adjustment_less"
-                draft={draft}
-                setDraft={setDraft}
-                negative
-                hint={row.late_charge != null ? `computed late/undertime ₱${peso(Number(row.late_charge))}` : undefined}
-              />
-              <tr className="border-t-2 border-ink/20">
-                <td className="py-2 font-bold text-ink">TOTAL</td>
-                <td />
-                <td className="py-2 text-right font-bold tabular-nums text-ink">₱{peso(totals.subtotal)}</td>
-              </tr>
-              <EditLine label="Cash advance" field="cash_advance" draft={draft} setDraft={setDraft} negative />
-              <EditLine label="SSS" field="sss" draft={draft} setDraft={setDraft} negative />
-              <EditLine label="PhilHealth" field="philhealth" draft={draft} setDraft={setDraft} negative />
-              <EditLine label="Pag-IBIG" field="pagibig" draft={draft} setDraft={setDraft} negative />
-              <EditLine label="Others" field="others" draft={draft} setDraft={setDraft} negative />
-              <tr className="border-t-2 border-ink/20">
-                <td className="py-3 text-base font-bold text-ink">NET PAY</td>
-                <td />
-                <td className="py-3 text-right text-base font-bold tabular-nums text-ink">₱{peso(totals.net)}</td>
-              </tr>
-            </tbody>
-          </table>
+        <div className="mt-4">
+          <PayslipView
+            employeeName={employeeName}
+            employeeCode={row.employee_code}
+            branchName={row.branch_name}
+            dateHired={hired[employeeId] ?? null}
+            leaveRemaining={leaveLeft[employeeId] ?? 0}
+            dailyRate={row.daily_rate}
+            dailyAllowance={row.daily_allowance}
+            periodLabel={formatPeriodLabel(period)}
+            periodStart={period.start}
+            periodEnd={period.end}
+            daysPresent={row.days_present}
+            fullDays={row.full_days}
+            paidLeaveDays={row.paid_leave_days}
+            otPaidHours={row.ot_paid_hours}
+            amounts={draft}
+            totals={totals}
+            onChange={isDeployed ? undefined : setDraft}
+            lateChargeHint={row.late_charge}
+          />
         </div>
       )}
     </div>
-  );
-}
-
-function Line({ label, remark, value, strong }: { label: string; remark?: string; value: number; strong?: boolean }) {
-  return (
-    <tr className="border-t border-line">
-      <td className={`py-1.5 ${strong ? 'font-semibold text-ink' : 'text-ink'}`}>{label}</td>
-      <td className="py-1.5 text-xs text-muted">{remark}</td>
-      <td className="py-1.5 text-right tabular-nums text-ink">₱{peso(value)}</td>
-    </tr>
-  );
-}
-
-function EditLine({
-  label,
-  field,
-  draft,
-  setDraft,
-  negative,
-  hint,
-}: {
-  label: string;
-  field: keyof PayslipManualAmounts;
-  draft: PayslipManualAmounts;
-  setDraft: (d: PayslipManualAmounts) => void;
-  negative?: boolean;
-  hint?: string;
-}) {
-  const v = draft[field];
-  return (
-    <tr className="border-t border-line">
-      <td className="py-1.5 text-ink">{label}</td>
-      <td className="py-1.5 text-xs text-muted">{hint}</td>
-      <td className="py-1.5 text-right">
-        {/* Printed slips show the number; on screen it stays editable. */}
-        <span className="hidden tabular-nums print:inline">
-          {negative && v > 0 ? '−' : ''}₱{peso(v)}
-        </span>
-        <input
-          type="number"
-          min={0}
-          step="0.01"
-          value={v === 0 ? '' : v}
-          placeholder="0.00"
-          onChange={(e) => setDraft({ ...draft, [field]: Math.max(0, Number(e.target.value) || 0) })}
-          className={`input w-32 text-right tabular-nums print:hidden ${negative && v > 0 ? 'text-red-600' : ''}`}
-        />
-      </td>
-    </tr>
   );
 }

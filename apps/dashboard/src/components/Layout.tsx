@@ -34,6 +34,7 @@ interface NavItem {
 const NAV: NavItem[] = [
   { to: '/my', end: true, label: 'My time clock', icon: Fingerprint, access: 'all' },
   { to: '/my/leave', label: 'My leave', icon: CalendarCheck, access: 'all' },
+  { to: '/my/payslip', label: 'My payslip', icon: Receipt, access: 'all' },
   { to: '/', end: true, label: 'Dashboard', icon: LayoutDashboard, access: 'manager' },
   { to: '/employees', label: 'Employees', icon: Users, access: 'manager' },
   { to: '/punches', label: 'Punches', icon: Clock, access: 'manager' },

@@ -70,6 +70,8 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   mfa_reset: '2FA reset (admin)',
   compensation_set: 'Compensation set',
   payroll_adjustment_set: 'Payslip amounts set',
+  payroll_period_deployed: 'Payslips deployed to staff',
+  payroll_period_undeployed: 'Payslips un-deployed',
 };
 
 export const ROLE_LABELS: Record<Role, string> = {

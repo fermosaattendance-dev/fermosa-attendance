@@ -563,6 +563,9 @@ export function TimeClock() {
             Leave &amp; balances
           </Link>
         )}
+        <Link to="/my/payslip" className="btn">
+          My payslip
+        </Link>
         <Link to="/my/password" className="btn">
           Change password
         </Link>

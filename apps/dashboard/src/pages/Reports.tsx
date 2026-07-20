@@ -114,6 +114,13 @@ interface ReportTable {
   filename: string;
 }
 
+/** Rows for one date range — what fetchRange returns and buildTable consumes. */
+interface RangeData {
+  payrollRows: PayrollSummaryRow[];
+  effRows: EffRow[];
+  leaveRows: LeaveRow[];
+}
+
 export function Reports() {
   const { profile } = useAuth();
   const isCompanyWide = profile ? COMPANY_WIDE_ROLES.includes(profile.role) : false;
@@ -230,8 +237,66 @@ export function Reports() {
     load();
   }, [load]);
 
-  const table = useMemo<ReportTable>(() => {
-    const periodTag = `${year}-${String(month).padStart(2, '0')}_${half === 1 ? '1-15' : '16-eom'}`;
+  /**
+   * Fetch one report's rows for an ARBITRARY range — the same queries `load`
+   * runs, but returning instead of setting state, so the month export can pull
+   * several ranges without disturbing what's on screen.
+   */
+  const fetchRange = useCallback(
+    async (from: string, to: string): Promise<RangeData> => {
+      const branchArg = branchId || null;
+      const empty: RangeData = { payrollRows: [], effRows: [], leaveRows: [] };
+      if (reportType === 'payroll' || reportType === 'branch') {
+        const { data } = await supabase.rpc('report_payroll_summary', {
+          p_from: from,
+          p_to: to,
+          p_branch_id: branchArg,
+        });
+        return { ...empty, payrollRows: (data as PayrollSummaryRow[]) ?? [] };
+      }
+      if (reportType === 'timesheet') {
+        if (!employeeId) return empty;
+        const { data } = await supabase
+          .from('attendance_effective')
+          .select(EFF_COLS)
+          .eq('employee_id', employeeId)
+          .gte('work_date', from)
+          .lte('work_date', to)
+          .order('work_date');
+        return { ...empty, effRows: (data as EffRow[]) ?? [] };
+      }
+      if (reportType === 'overtime') {
+        let q = supabase
+          .from('attendance_effective')
+          .select(EFF_COLS)
+          .gt('overtime_minutes', 0)
+          .gte('work_date', from)
+          .lte('work_date', to);
+        if (branchArg) q = q.eq('branch_id', branchArg);
+        const { data } = await q;
+        return { ...empty, effRows: (data as EffRow[]) ?? [] };
+      }
+      if (reportType === 'leave') {
+        const { data } = await supabase
+          .from('leave_requests')
+          .select(
+            'id, employee_id, start_date, end_date, half_day, day_count, status, reason, employee:profiles!leave_requests_employee_id_fkey(full_name, employee_code, branch_id), leave_type:leave_types(name, is_paid)',
+          )
+          .eq('status', 'approved')
+          .lte('start_date', to)
+          .gte('end_date', from)
+          .order('start_date');
+        return { ...empty, leaveRows: (data as unknown as LeaveRow[]) ?? [] };
+      }
+      return empty;
+    },
+    [reportType, branchId, employeeId],
+  );
+
+  /** Build the current report's table from a given set of rows. */
+  const buildTable = useCallback(
+    (data: RangeData, periodTag: string): ReportTable => {
+    const { payrollRows, effRows, leaveRows } = data;
     const nameOf = (id: string) => empMap.get(id)?.full_name ?? '';
 
     switch (reportType) {
@@ -325,7 +390,43 @@ export function Reports() {
         return { headers, rows, sheetName: 'Leave', filename: `leave_${periodTag}` };
       }
     }
-  }, [reportType, payrollRows, effRows, leaveRows, year, month, half, dayDate, branchId, employeeId, empMap, branchMap, isCompanyWide]);
+    },
+    [reportType, dayDate, employeeId, empMap, branchMap, isCompanyWide],
+  );
+
+  const periodTag = `${year}-${String(month).padStart(2, '0')}_${half === 1 ? '1-15' : '16-eom'}`;
+  const table = useMemo<ReportTable>(
+    () => buildTable({ payrollRows, effRows, leaveRows }, periodTag),
+    [buildTable, payrollRows, effRows, leaveRows, periodTag],
+  );
+
+  /**
+   * One workbook covering the whole month: a tab per cutoff plus a combined
+   * whole-month tab. The month tab comes from the RPC over the full range (not
+   * from adding the two halves client-side), so rates and charges stay correct.
+   */
+  const exportMonth = async () => {
+    setError(null);
+    try {
+      const [p1, p2] = semiMonthlyPeriods(year, month);
+      const [d1, d2, dm] = await Promise.all([
+        fetchRange(p1!.start, p1!.end),
+        fetchRange(p2!.start, p2!.end),
+        fetchRange(p1!.start, p2!.end),
+      ]);
+      const tag = `${year}-${String(month).padStart(2, '0')}`;
+      const t1 = buildTable(d1, `${tag}_1-15`);
+      const t2 = buildTable(d2, `${tag}_16-eom`);
+      const tm = buildTable(dm, `${tag}_month`);
+      exportXlsx(`${tm.sheetName.toLowerCase().replace(/\s+/g, '_')}_${tag}_month`, [
+        { name: '1-15', headers: t1.headers, rows: t1.rows },
+        { name: '16-EOM', headers: t2.headers, rows: t2.rows },
+        { name: 'Whole month', headers: tm.headers, rows: tm.rows },
+      ]);
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
 
   /**
    * Totals for the Employee timesheet. Deliberately the SAME rule the employee
@@ -498,6 +599,12 @@ export function Reports() {
           >
             Export CSV
           </button>
+          {/* Whole month in one file: 1–15, 16–EOM and a combined tab. */}
+          {reportType !== 'daily' && (
+            <button onClick={() => void exportMonth()} className="btn">
+              Export month (3 tabs)
+            </button>
+          )}
         </div>
       </div>
 
