@@ -14,3 +14,9 @@ const url = (import.meta.env.VITE_SUPABASE_URL as string | undefined) || FALLBAC
 const anonKey = (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined) || FALLBACK_ANON_KEY;
 
 export const supabase = createClient(url, anonKey);
+
+// Resolved URL + anon key (env or fallback) for callers that hit the REST/Edge
+// endpoints directly with a plain fetch — e.g. the kiosk terminal, which has no
+// personal session and posts to the kiosk-punch Edge Function with the anon key.
+export const supabaseUrl = url;
+export const supabaseAnonKey = anonKey;

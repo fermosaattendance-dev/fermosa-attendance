@@ -11,6 +11,7 @@ import { Org } from './pages/Org';
 import { Overview } from './pages/Overview';
 import { Punches } from './pages/Punches';
 import { Kiosks } from './pages/Kiosks';
+import { KioskMode } from './pages/KioskMode';
 import { Leave } from './pages/Leave';
 import { Payslips } from './pages/Payslips';
 import { Reports } from './pages/Reports';
@@ -70,6 +71,8 @@ export default function App() {
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<LoginGate />} />
+          {/* Shared branch terminal — no personal session, so it lives outside RequireAuth. */}
+          <Route path="/kiosk" element={<KioskMode />} />
           <Route element={<RequireAuth />}>
             <Route path="/" element={<Landing />} />
             <Route path="/my" element={<TimeClock />} />

@@ -20,7 +20,7 @@ export interface GpsFix {
 const GPS_TIMEOUT_MS = 6000;
 
 /** UUID that also works in insecure contexts (crypto.randomUUID needs HTTPS/localhost). */
-function uuid(): string {
+export function uuid(): string {
   const c = globalThis.crypto;
   if (c && typeof c.randomUUID === 'function') return c.randomUUID();
   const b = new Uint8Array(16);
