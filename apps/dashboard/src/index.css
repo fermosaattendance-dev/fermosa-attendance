@@ -100,3 +100,28 @@
     @apply bg-ground/60;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Print — used by the Payslips page so "Print / Save as PDF" produces just the
+   payslip, without the sidebar, nav or any buttons.
+   --------------------------------------------------------------------------- */
+@media print {
+  .no-print,
+  aside,
+  header {
+    display: none !important;
+  }
+  body {
+    background: #fff;
+  }
+  main {
+    max-width: none !important;
+    padding: 0 !important;
+  }
+  #payslip {
+    box-shadow: none !important;
+    border: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+}

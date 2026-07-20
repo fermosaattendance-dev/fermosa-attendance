@@ -111,6 +111,28 @@ export interface PayrollSummaryRow {
   ot_pay: number | null; // ot_paid_hours × daily_rate × 1.25/8; null when rate hidden
 }
 
+/**
+ * One row of public.payroll_adjustments — the manual amounts HR sets per
+ * employee per pay period (uploaded in bulk from a spreadsheet, or edited on a
+ * single payslip). Admin-only: RLS returns nothing to branch managers.
+ */
+export interface PayrollAdjustments {
+  employee_id: string;
+  period_start: string;
+  period_end: string;
+  add_allowance: number;
+  holiday_pay: number;
+  others_less: number;
+  adjustment_less: number;
+  cash_advance: number;
+  sss: number;
+  philhealth: number;
+  pagibig: number;
+  others: number;
+  note: string | null;
+  updated_at: string;
+}
+
 /** Status of a payroll → Google Sheets push. */
 export type PayrollSyncStatus = 'synced' | 'dry_run' | 'failed';
 

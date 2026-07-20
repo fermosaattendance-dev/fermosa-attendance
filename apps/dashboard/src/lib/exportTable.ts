@@ -1,5 +1,6 @@
-// Client-side report export. We only *write* workbooks (never parse untrusted
-// files), so SheetJS is used purely for its writer.
+// Client-side report export — SheetJS used as a writer. Reading workbooks lives
+// in importTable.ts and is limited to files a signed-in HR/admin picks from
+// their own machine; we still never parse untrusted files from the network.
 import * as XLSX from 'xlsx';
 
 export type Cell = string | number | null;
