@@ -318,11 +318,11 @@ export function Reports() {
       case 'branch': {
         const agg = new Map<
           string,
-          { branch: string; emps: number; present: number; absent: number; worked: number; late: number; ot: number; paid: number; unpaid: number }
+          { branch: string; emps: number; present: number; absent: number; worked: number; late: number; ot: number; paid: number; unpaid: number; names: string[] }
         >();
         for (const r of payrollRows) {
           const cur = agg.get(r.branch_id) ?? {
-            branch: r.branch_name, emps: 0, present: 0, absent: 0, worked: 0, late: 0, ot: 0, paid: 0, unpaid: 0,
+            branch: r.branch_name, emps: 0, present: 0, absent: 0, worked: 0, late: 0, ot: 0, paid: 0, unpaid: 0, names: [],
           };
           cur.emps += 1;
           cur.present += r.days_present;
@@ -332,12 +332,17 @@ export function Reports() {
           cur.ot += r.overtime_minutes;
           cur.paid += r.paid_leave_days;
           cur.unpaid += r.unpaid_leave_days;
+          // Anyone with at least one present day in the cutoff.
+          if (r.days_present > 0) cur.names.push(r.full_name);
           agg.set(r.branch_id, cur);
         }
-        const headers = ['Branch', 'Employees', 'Present days', 'Absent days', 'Worked (h)', 'Late (min)', 'OT (min)', 'Paid leave', 'Unpaid leave'];
+        const headers = ['Branch', 'Employees', 'Present days', 'Absent days', 'Worked (h)', 'Late (min)', 'OT (min)', 'Paid leave', 'Unpaid leave', 'Present employees'];
         const rows: Cell[][] = [...agg.values()]
           .sort((a, b) => a.branch.localeCompare(b.branch))
-          .map((a) => [a.branch, a.emps, a.present, a.absent, hours(a.worked), a.late, a.ot, fmtDays(a.paid), fmtDays(a.unpaid)]);
+          .map((a) => [
+            a.branch, a.emps, a.present, a.absent, hours(a.worked), a.late, a.ot, fmtDays(a.paid), fmtDays(a.unpaid),
+            a.names.sort((x, y) => x.localeCompare(y)).join(', '),
+          ]);
         return { headers, rows, sheetName: 'Branch summary', filename: `branch_summary_${periodTag}` };
       }
       case 'daily': {
@@ -680,8 +685,14 @@ export function Reports() {
                     rawPill && header === 'Approval' && cell === 'rejected'
                       ? { ...rawPill, label: 'Voided' }
                       : rawPill;
+                  // The present-employees list can be long — let it wrap instead
+                  // of forcing the whole table wider.
+                  const wrapCol = header === 'Present employees';
                   return (
-                    <td key={j} className="whitespace-nowrap px-3 py-2 text-gray-700">
+                    <td
+                      key={j}
+                      className={`px-3 py-2 text-gray-700 ${wrapCol ? 'min-w-[16rem] max-w-md whitespace-normal align-top' : 'whitespace-nowrap'}`}
+                    >
                       {pill ? (
                         <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${pill.cls}`}>
                           {pill.label}
