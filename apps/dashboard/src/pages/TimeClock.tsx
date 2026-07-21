@@ -109,6 +109,14 @@ function recentWindowStartIso(hours = 18): string {
   return new Date(Date.now() - hours * 3600 * 1000).toISOString();
 }
 
+// Company-wide switch (attendance_settings.self_punch_enabled): when off, staff
+// punch only on the branch kiosk and the Time In/Out buttons are hidden here.
+// Cached so the decision holds on first paint and offline; default true.
+const SELF_PUNCH_KEY = 'fermosa.self_punch_enabled';
+function readSelfPunchCached(): boolean {
+  return localStorage.getItem(SELF_PUNCH_KEY) !== 'false';
+}
+
 /**
  * Employee self-service time clock — the browser equivalent of the mobile home
  * screen. Offline-first: status + recent list come from the local IndexedDB
@@ -136,6 +144,8 @@ export function TimeClock() {
   const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
   // Two-shift branch: the employee picks which shift they're timing in for.
   const [selectedShift, setSelectedShift] = useState<{ start: string; end: string } | null>(null);
+  // Company-wide self-punch switch (kiosk-only mode hides the buttons here).
+  const [selfPunchEnabled, setSelfPunchEnabled] = useState<boolean>(() => readSelfPunchCached());
 
   const isRoving = !!profile && profile.branch_id === null;
   const effectiveBranchId = profile?.branch_id ?? selectedBranchId;
@@ -299,6 +309,21 @@ export function TimeClock() {
       .then(({ data }) => setBranch((data as BranchInfo | null) ?? null));
   }, [effectiveBranchId]);
 
+  // Read the company-wide self-punch switch (any member may read
+  // attendance_settings under RLS). Cache it so it holds offline.
+  useEffect(() => {
+    if (!profile || !navigator.onLine) return;
+    supabase
+      .from('attendance_settings')
+      .select('self_punch_enabled')
+      .maybeSingle()
+      .then(({ data }) => {
+        const enabled = (data as { self_punch_enabled?: boolean } | null)?.self_punch_enabled ?? true;
+        setSelfPunchEnabled(enabled);
+        localStorage.setItem(SELF_PUNCH_KEY, enabled ? 'true' : 'false');
+      });
+  }, [profile]);
+
   // Multi-shift branch (2 or 3 shifts): the employee picks which shift they're
   // timing in for, remembered per day so time-out doesn't re-ask.
   const shiftOptions = branch ? branchShifts(branch) : [];
@@ -437,6 +462,10 @@ export function TimeClock() {
 
   if (!profile) return null;
 
+  // Kiosk-only mode hides the punch UI, but ONLY for the plain employee role —
+  // managers / HR / ops / super-admin keep timing in on their own account.
+  const showPunch = selfPunchEnabled || profile.role !== 'employee';
+
   return (
     <div className="mx-auto max-w-xl">
       <PageHeader title="My time clock" crumb="My time clock" subtitle={branch?.name} />
@@ -468,7 +497,7 @@ export function TimeClock() {
         )}
       </div>
 
-      {isRoving && (
+      {showPunch && isRoving && (
         <div className="card mt-4 px-4 py-4">
           <label className="text-sm">
             <span className="block text-xs font-medium text-gray-500">Which branch are you at today?</span>
@@ -493,7 +522,7 @@ export function TimeClock() {
         </div>
       )}
 
-      {branchHasMultipleShifts && (
+      {showPunch && branchHasMultipleShifts && (
         <div className="card mt-4 px-4 py-4">
           <span className="block text-xs font-medium text-gray-500">
             Which shift are you timing in for today?
@@ -524,24 +553,30 @@ export function TimeClock() {
         </div>
       )}
 
-      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-        {allowed.map((type) => (
-          <button
-            key={type}
-            onClick={() => onAction(type)}
-            disabled={busy || (isRoving && !selectedBranchId) || (branchHasMultipleShifts && !selectedShift)}
-            className={`rounded-2xl py-5 text-lg font-bold text-white transition disabled:opacity-50 ${
-              type === 'clock_in'
-                ? 'bg-green-600 hover:bg-green-700'
-                : type === 'clock_out'
-                  ? 'bg-red-600 hover:bg-red-700'
-                  : 'bg-amber-600 hover:bg-amber-700'
-            }`}
-          >
-            {busy ? '…' : PUNCH_LABELS[type]}
-          </button>
-        ))}
-      </div>
+      {showPunch ? (
+        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {allowed.map((type) => (
+            <button
+              key={type}
+              onClick={() => onAction(type)}
+              disabled={busy || (isRoving && !selectedBranchId) || (branchHasMultipleShifts && !selectedShift)}
+              className={`rounded-2xl py-5 text-lg font-bold text-white transition disabled:opacity-50 ${
+                type === 'clock_in'
+                  ? 'bg-green-600 hover:bg-green-700'
+                  : type === 'clock_out'
+                    ? 'bg-red-600 hover:bg-red-700'
+                    : 'bg-amber-600 hover:bg-amber-700'
+              }`}
+            >
+              {busy ? '…' : PUNCH_LABELS[type]}
+            </button>
+          ))}
+        </div>
+      ) : (
+        <p className="mt-4 rounded-xl bg-ground px-4 py-3 text-center text-sm text-muted">
+          ⏱ Time in and out are done at the branch kiosk.
+        </p>
+      )}
 
       {note && <p className="mt-4 rounded-xl bg-ground px-4 py-3 text-sm text-ink">{note}</p>}
       {error && <p className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600">{error}</p>}

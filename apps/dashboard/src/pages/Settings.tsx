@@ -41,6 +41,7 @@ export function Settings() {
   const [otThreshold, setOtThreshold] = useState('30');
   const [minBreak, setMinBreak] = useState('60');
   const [halfDayLate, setHalfDayLate] = useState('60');
+  const [selfPunch, setSelfPunch] = useState(true);
   const [holidays, setHolidays] = useState<HolidayRow[]>([]);
   const [hDate, setHDate] = useState('');
   const [hName, setHName] = useState('');
@@ -66,6 +67,7 @@ export function Settings() {
         setOtThreshold(String(data.ot_threshold_min));
         setMinBreak(String(data.min_break_min));
         setHalfDayLate(String(data.half_day_late_min ?? 60));
+        setSelfPunch(data.self_punch_enabled ?? true);
       }
     });
     supabase.from('holidays').select('id, holiday_date, name, kind').order('holiday_date')
@@ -91,6 +93,7 @@ export function Settings() {
         ot_threshold_min: Number(otThreshold),
         min_break_min: Number(minBreak),
         half_day_late_min: Number(halfDayLate),
+        self_punch_enabled: selfPunch,
       })
       .eq('company_id', profile!.company_id);
     if (err) setError(err.message);
@@ -238,6 +241,24 @@ export function Settings() {
             <p className="mt-1 text-xs text-gray-500">Deducted on days over 5 hours even without break punches.</p>
           </div>
         </div>
+
+        <div className="mt-5 border-t border-gray-100 pt-4">
+          <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+            <input
+              type="checkbox"
+              checked={selfPunch}
+              onChange={(e) => setSelfPunch(e.target.checked)}
+            />
+            Allow employees to time in/out from their own device
+          </label>
+          <p className="mt-1 text-xs text-gray-500">
+            Turn off when staff punch only on the branch kiosk — this hides the Time In / Time Out
+            buttons on the My time clock of <strong>Employee-role</strong> accounts only. Managers,
+            HR, and admins keep punching on their own account. Filing leave, payslips, and the rest
+            stay available for everyone.
+          </p>
+        </div>
+
         {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
         {notice && <p className="mt-3 text-sm text-green-700">{notice}</p>}
         <button type="submit" className="mt-4 btn-primary">
