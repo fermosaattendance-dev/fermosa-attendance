@@ -1,5 +1,4 @@
 import {
-  BREAKS_ENABLED,
   PUNCH_LABELS,
   SELFIE_PUNCH_TYPES,
   branchShifts,
@@ -117,6 +116,15 @@ function readSelfPunchCached(): boolean {
   return localStorage.getItem(SELF_PUNCH_KEY) !== 'false';
 }
 
+// Company-wide switch (attendance_settings.break_punch_enabled): when on, the
+// Start Break / End Break buttons appear here; when off, staff only Time In/Out
+// and the engine auto-deducts the minimum break on long days. Cached so the
+// decision holds on first paint and offline; default false (breaks hidden).
+const BREAK_PUNCH_KEY = 'fermosa.break_punch_enabled';
+function readBreakPunchCached(): boolean {
+  return localStorage.getItem(BREAK_PUNCH_KEY) === 'true';
+}
+
 /**
  * Employee self-service time clock — the browser equivalent of the mobile home
  * screen. Offline-first: status + recent list come from the local IndexedDB
@@ -146,6 +154,8 @@ export function TimeClock() {
   const [selectedShift, setSelectedShift] = useState<{ start: string; end: string } | null>(null);
   // Company-wide self-punch switch (kiosk-only mode hides the buttons here).
   const [selfPunchEnabled, setSelfPunchEnabled] = useState<boolean>(() => readSelfPunchCached());
+  // Company-wide break-punch switch (when on, Start Break / End Break show).
+  const [breakPunchEnabled, setBreakPunchEnabled] = useState<boolean>(() => readBreakPunchCached());
 
   const isRoving = !!profile && profile.branch_id === null;
   const effectiveBranchId = profile?.branch_id ?? selectedBranchId;
@@ -315,12 +325,16 @@ export function TimeClock() {
     if (!profile || !navigator.onLine) return;
     supabase
       .from('attendance_settings')
-      .select('self_punch_enabled')
+      .select('self_punch_enabled, break_punch_enabled')
       .maybeSingle()
       .then(({ data }) => {
-        const enabled = (data as { self_punch_enabled?: boolean } | null)?.self_punch_enabled ?? true;
-        setSelfPunchEnabled(enabled);
-        localStorage.setItem(SELF_PUNCH_KEY, enabled ? 'true' : 'false');
+        const row = data as { self_punch_enabled?: boolean; break_punch_enabled?: boolean } | null;
+        const selfOn = row?.self_punch_enabled ?? true;
+        setSelfPunchEnabled(selfOn);
+        localStorage.setItem(SELF_PUNCH_KEY, selfOn ? 'true' : 'false');
+        const breakOn = row?.break_punch_enabled ?? false;
+        setBreakPunchEnabled(breakOn);
+        localStorage.setItem(BREAK_PUNCH_KEY, breakOn ? 'true' : 'false');
       });
   }, [profile]);
 
@@ -350,9 +364,10 @@ export function TimeClock() {
 
   const lastType: PunchType | null = punches.at(-1)?.type ?? null;
   const workStatus = workStatusFromLastPunch(lastType);
-  // Breaks are hidden for now — the engine deducts the 60-min break
-  // automatically on days over 5 h (see BREAKS_ENABLED in shared).
-  const allowed: PunchType[] = BREAKS_ENABLED
+  // Breaks are a company-wide toggle (attendance_settings.break_punch_enabled).
+  // When off, staff only Time In/Out and the engine deducts the minimum break
+  // automatically on days over 5 h.
+  const allowed: PunchType[] = breakPunchEnabled
     ? nextAllowedPunchTypes(lastType)
     : workStatus === 'clocked_out'
       ? ['clock_in']

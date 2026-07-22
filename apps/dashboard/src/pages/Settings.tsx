@@ -42,6 +42,7 @@ export function Settings() {
   const [minBreak, setMinBreak] = useState('60');
   const [halfDayLate, setHalfDayLate] = useState('60');
   const [selfPunch, setSelfPunch] = useState(true);
+  const [breakPunch, setBreakPunch] = useState(false);
   const [holidays, setHolidays] = useState<HolidayRow[]>([]);
   const [hDate, setHDate] = useState('');
   const [hName, setHName] = useState('');
@@ -68,6 +69,7 @@ export function Settings() {
         setMinBreak(String(data.min_break_min));
         setHalfDayLate(String(data.half_day_late_min ?? 60));
         setSelfPunch(data.self_punch_enabled ?? true);
+        setBreakPunch(data.break_punch_enabled ?? false);
       }
     });
     supabase.from('holidays').select('id, holiday_date, name, kind').order('holiday_date')
@@ -94,6 +96,7 @@ export function Settings() {
         min_break_min: Number(minBreak),
         half_day_late_min: Number(halfDayLate),
         self_punch_enabled: selfPunch,
+        break_punch_enabled: breakPunch,
       })
       .eq('company_id', profile!.company_id);
     if (err) setError(err.message);
@@ -256,6 +259,22 @@ export function Settings() {
             buttons on the My time clock of <strong>Employee-role</strong> accounts only. Managers,
             HR, and admins keep punching on their own account. Filing leave, payslips, and the rest
             stay available for everyone.
+          </p>
+        </div>
+
+        <div className="mt-5 border-t border-gray-100 pt-4">
+          <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+            <input
+              type="checkbox"
+              checked={breakPunch}
+              onChange={(e) => setBreakPunch(e.target.checked)}
+            />
+            Let employees punch their own break times
+          </label>
+          <p className="mt-1 text-xs text-gray-500">
+            When on, <strong>Start Break / End Break</strong> buttons appear on the My time clock.
+            When off, staff just Time In and Time Out, and the system automatically sets aside the
+            minimum break on long days.
           </p>
         </div>
 
