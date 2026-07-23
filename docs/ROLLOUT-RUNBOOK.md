@@ -82,8 +82,16 @@ export SUPABASE_ACCESS_TOKEN=<your token from supabase.com → Account → Acces
 npx supabase@latest functions deploy admin-users   --project-ref <PROD_REF>
 npx supabase@latest functions deploy kiosk-punch    --project-ref <PROD_REF>
 npx supabase@latest functions deploy payroll-sync   --project-ref <PROD_REF>
-npx supabase@latest functions deploy purge-selfies  --project-ref <PROD_REF>
+npx supabase@latest functions deploy purge-selfies  --project-ref <PROD_REF> --no-verify-jwt
 ```
+
+`purge-selfies` **must** be deployed with `--no-verify-jwt`. The pg_cron job
+calls it via pg_net with only the `x-purge-secret` header — no `Authorization`
+— so with JWT verification on, the platform rejects every cron call
+(`401 UNAUTHORIZED_NO_AUTH_HEADER`) before the function's own secret check ever
+runs: selfies are never purged and storage grows unbounded. The shared
+`PURGE_SECRET` is the real auth (the function itself returns 401 without it).
+The other three functions keep JWT verification.
 
 **Selfie retention (7-day auto-delete).** The `selfie_retention` migration
 schedules a daily pg_cron job that calls `purge-selfies`. Wire its secret (once):
@@ -105,6 +113,18 @@ safe dry-run).
 
 **Check:** `curl -s -X POST https://<PROD_REF>.supabase.co/functions/v1/admin-users -H "Authorization: Bearer <prod anon key>" -H "apikey: <prod anon key>" -d '{}'`
 returns `{"ok":false,"error":"not authenticated"}` (alive, not 404).
+
+**Check (purge-selfies):** simulate the cron call — secret header only, no
+`Authorization` — and probe that the secret is still required:
+
+```bash
+# cron simulation → 200 {"ok":true,...}. A platform 401 here means the function
+# was deployed with JWT verification on — redeploy with --no-verify-jwt.
+curl -s -X POST https://<PROD_REF>.supabase.co/functions/v1/purge-selfies \
+  -H "x-purge-secret: <PURGE_SECRET>" -H "Content-Type: application/json" -d '{}'
+# negative probe (no secret) → 401 {"ok":false,"error":"unauthorized"}
+curl -s -X POST https://<PROD_REF>.supabase.co/functions/v1/purge-selfies -d '{}'
+```
 
 ---
 

@@ -16,6 +16,9 @@ create extension if not exists pg_net;
 --     'https://<PROD_REF>.supabase.co/functions/v1/purge-selfies', 'purge_selfies_url');
 --   select vault.create_secret('<random-strong-secret>', 'purge_selfies_secret');
 --   -- and: supabase secrets set PURGE_SECRET=<same-random-strong-secret>
+--   -- and: deploy purge-selfies with --no-verify-jwt — this call sends no
+--   -- Authorization header, so with JWT verification on the platform 401s
+--   -- every cron run before the x-purge-secret check (selfies never purged).
 select cron.schedule(
   'purge-selfies-daily',
   '30 19 * * *',
